@@ -4,7 +4,7 @@ import '../widgets/banner_landscape_decoration.dart';
 import 'sport_prep_screen.dart';
 
 class SportMainScreen extends StatefulWidget {
-  const SportMainScreen({super.key});
+  const            SportMainScreen({super.key});
 
   @override
   State<SportMainScreen> createState() => _SportMainScreenState();
@@ -100,7 +100,7 @@ class _SportMainScreenState extends State<SportMainScreen> {
 
   Widget _buildTopBanner() {
     return SizedBox(
-      height: 260,
+      height: 270,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -120,7 +120,7 @@ class _SportMainScreenState extends State<SportMainScreen> {
               bottomRight: Radius.circular(80),
             ),
             child: SizedBox(
-              height: 260,
+              height: 270,
               width: double.infinity,
               child: Image.asset(
                 'assets/images/sport_main_banner.png',
@@ -135,7 +135,7 @@ class _SportMainScreenState extends State<SportMainScreen> {
 
   Widget _buildPageTitle() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
       child: SizedBox(
         height: 56,
         child: Stack(

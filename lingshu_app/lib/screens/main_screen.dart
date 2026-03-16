@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'home_screen.dart';
 import 'ai_diagnosis_screen.dart';
@@ -32,28 +33,30 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _pages[_index],
-      bottomNavigationBar: Container(
-        height: 88,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8F5ED),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF8B7D6B).withValues(alpha: 0.08),
-              blurRadius: 24,
-              offset: const Offset(0, -6),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(0, '首页', 'assets/images/icon_nav_home.svg'),
-              _buildNavItem(1, '望闻问切', 'assets/images/icon_nav_diagnosis.svg'),
-              _buildNavItem(2, '女神专区', 'assets/images/icon_nav_goddess.svg'),
-              _buildNavItem(3, '心灵栖息', 'assets/images/icon_nav_meditation.svg'),
-              _buildNavItem(4, '智能运动', 'assets/images/icon_nav_sport.svg'),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          height: 88.h,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F5ED),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF8B7D6B).withValues(alpha: 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, -6),
+              ),
             ],
+          ),
+          child: SafeArea(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(0, '首页', 'assets/images/icon_nav_home.svg'),
+                _buildNavItem(1, '望闻问切', 'assets/images/icon_nav_diagnosis.svg'),
+                _buildNavItem(2, '女神专区', 'assets/images/icon_nav_goddess.svg'),
+                _buildNavItem(3, '心灵栖息', 'assets/images/icon_nav_meditation.svg'),
+                _buildNavItem(4, '智能运动', 'assets/images/icon_nav_sport.svg'),
+              ],
+            ),
           ),
         ),
       ),
@@ -76,7 +79,7 @@ class _MainScreenState extends State<MainScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               AnimatedContainer(
-                duration: const Duration(milliseconds: 260),
+                duration: isSelected ? const Duration(milliseconds: 260) : const Duration(microseconds: 0),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 4,

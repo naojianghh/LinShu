@@ -215,7 +215,7 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
 
   Widget _buildTopBanner() {
     return SizedBox(
-      height: 260,
+      height: 270,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -225,7 +225,7 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
               bottomRight: Radius.circular(80),
             ),
             child: SizedBox(
-              height: 260,
+              height: 270,
               width: double.infinity,
               child: Image.asset(
                 'assets/images/meditation_main_banner.png',

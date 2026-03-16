@@ -83,7 +83,7 @@ class _GoddessScreenState extends State<GoddessScreen> {
           SliverToBoxAdapter(child: _buildTopBanner()),
           SliverToBoxAdapter(child: _title()),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverToBoxAdapter(child: _tabs()),
           ),
           SliverPadding(
@@ -146,9 +146,9 @@ class _GoddessScreenState extends State<GoddessScreen> {
 
   Widget _title() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
       child: SizedBox(
-        height: 60,
+        height: 56,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -158,7 +158,8 @@ class _GoddessScreenState extends State<GoddessScreen> {
                 Text(
                   '女神专区',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                     color: Color(0xFF2D4A3E),
                     fontFamily: 'STKaiti',
                   ),
@@ -167,7 +168,7 @@ class _GoddessScreenState extends State<GoddessScreen> {
                 Text(
                   '基于生理周期的体质智能调理平台',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 13,
                     color: Color(0xFF8B7D6B),
                     fontFamily: 'STKaiti',
                   ),

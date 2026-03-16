@@ -1,4 +1,13 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
+
+import '../utils/log_util.dart';
 
 class SportPrepScreen extends StatefulWidget {
   final String sportType;
@@ -10,7 +19,183 @@ class SportPrepScreen extends StatefulWidget {
 }
 
 class _SportPrepScreenState extends State<SportPrepScreen> {
-  int _selectedTab = 0; // 0: 动作要领, 1: 准备提示
+  int _selectedTab = 0;
+
+  CameraController? _cameraController;
+  CameraDescription? _selectedCamera;
+  late PoseDetector _poseDetector;
+  bool _isDetecting = false;
+  List<CameraDescription>? _cameras;
+  bool hasInit = false;
+
+  int count = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDetectorAndCamera();
+  }
+
+  Future<void> _initDetectorAndCamera() async {
+    try {
+      Log.d('1. 检查相机权限', tag: 'Camera');
+      final status = await Permission.camera.request();
+      if (status.isGranted) {
+        Log.d('相机权限已授予', tag: 'Camera');
+      } else {
+        Log.d('相机权限被拒绝', tag: 'Camera');
+        if (mounted) setState(() {});
+        return;
+      }
+
+      Log.d('2. 初始化姿势检测器', tag: 'Camera');
+      _poseDetector = PoseDetector(
+        options: PoseDetectorOptions(mode: PoseDetectionMode.stream),
+      );
+
+      Log.d('3. 获取相机列表', tag: 'Camera');
+      _cameras = await availableCameras();
+
+      Log.d('条件判断：${_cameras != null && _cameras!.isNotEmpty}', tag: 'Camera');
+      if (_cameras != null && _cameras!.isNotEmpty) {
+        // 查找前置摄像头
+        CameraDescription? frontCamera;
+        for (final camera in _cameras!) {
+          if (camera.lensDirection == CameraLensDirection.front) {
+            frontCamera = camera;
+            break;
+          }
+        }
+        // 如果没有前置摄像头，使用第一个摄像头
+        final selectedCamera = frontCamera ?? _cameras!.first;
+        _selectedCamera = selectedCamera;
+        
+        Log.d('选择的相机方向: ${selectedCamera.lensDirection}', tag: 'Camera');
+        
+        _cameraController = CameraController(
+          selectedCamera,
+          ResolutionPreset.low,
+          enableAudio: false,
+          imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.bgra8888,
+        );
+
+        await _cameraController!.initialize();
+        Log.d('4. 初始化相机成功', tag: 'Camera');
+        if (mounted) {
+          setState(() {
+          hasInit = true;
+        });
+        }
+
+        Log.d('5. 启动相机流检测', tag: 'Camera');
+        _startPoseDetectionStream();
+      }
+    } catch (e) {
+      Log.e('初始化相机失败: $e', tag: 'Camera');
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _startPoseDetectionStream() {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
+
+    _cameraController!.startImageStream((CameraImage image) async {
+      if (_isDetecting) return;
+      _isDetecting = true;
+
+      try {
+        final inputImage = _convertCameraImage(image);
+        if (inputImage == null) {
+          Log.d("图像转换失败，跳过该帧", tag: 'Pose');
+          return;
+        }
+        
+        final poses = await _poseDetector.processImage(inputImage);
+
+        if (poses.isNotEmpty) {
+          Log.d("检测到 ${poses.length} 人", tag: 'Pose');
+        }
+      } catch (e) {
+        Log.e("检测错误：$e", tag: 'Pose');
+      } finally {
+        _isDetecting = false;
+      }
+    });
+  }
+
+  InputImage? _convertCameraImage(CameraImage image) {
+    try {
+      final camera = _selectedCamera;
+      
+      if (camera == null) {
+        Log.e('未选择相机', tag: 'Pose');
+        return null;
+      }
+      
+      final sensorOrientation = camera.sensorOrientation;
+      Log.d('相机传感器方向: $sensorOrientation', tag: 'Pose');
+      
+      InputImageRotation rotation;
+      if (Platform.isIOS) {
+        rotation = InputImageRotation.rotation90deg;
+      } else {
+        final isFrontCamera = camera.lensDirection == CameraLensDirection.front;
+        if (sensorOrientation == 90) {
+          rotation = isFrontCamera ? InputImageRotation.rotation270deg : InputImageRotation.rotation90deg;
+        } else if (sensorOrientation == 270) {
+          rotation = isFrontCamera ? InputImageRotation.rotation90deg : InputImageRotation.rotation270deg;
+        } else if (sensorOrientation == 0) {
+          rotation = InputImageRotation.rotation0deg;
+        } else {
+          rotation = InputImageRotation.rotation180deg;
+        }
+      }
+      
+      // 确定图像格式
+      InputImageFormat format;
+      if (image.format.group == ImageFormatGroup.nv21) {
+        format = InputImageFormat.nv21;
+      } else if (image.format.group == ImageFormatGroup.bgra8888) {
+        format = InputImageFormat.bgra8888;
+      } else {
+        format = InputImageFormat.yuv_420_888;
+      }
+      
+      Log.d('图像信息: 宽=${image.width}, 高=${image.height}, 旋转=$rotation, 格式=$format', tag: 'Pose');
+      
+      // 直接使用camera包提供的planes[0].bytes
+      final yPlane = image.planes[0];
+      final bytes = yPlane.bytes;
+      final bytesPerRow = yPlane.bytesPerRow;
+      
+      Log.d('Y平面: bytesPerRow=$bytesPerRow, 长度=${bytes.length}', tag: 'Pose');
+      
+      final inputImage = InputImage.fromBytes(
+        bytes: bytes,
+        metadata: InputImageMetadata(
+          size: Size(image.width.toDouble(), image.height.toDouble()),
+          rotation: rotation,
+          format: format,
+          bytesPerRow: bytesPerRow,
+        ),
+      );
+      
+      Log.d('创建 InputImage 成功', tag: 'Pose');
+      return inputImage;
+    } catch (e) {
+      Log.e('图像转换错误: $e', tag: 'Pose');
+      return null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _cameraController?.dispose(); // 页面关闭自动释放相机
+    _poseDetector.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -208,13 +393,32 @@ class _SportPrepScreenState extends State<SportPrepScreen> {
         color: const Color(0xFF101828),
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.videocam_outlined, color: Colors.white54, size: 48),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (hasInit)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return SizedBox(
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _cameraController!.value.previewSize!.height,
+                        height: _cameraController!.value.previewSize!.width,
+                        child: CameraPreview(_cameraController!),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.videocam_outlined, color: Colors.white54, size: 48),
               SizedBox(height: 12),
               Text(
                 '摄像头预览',
@@ -247,6 +451,7 @@ class _SportPrepScreenState extends State<SportPrepScreen> {
                       MaterialPageRoute(
                         builder: (context) => SportAiCorrectionScreen(
                           sportType: widget.sportType,
+                          cameraController: _cameraController,
                         ),
                       ),
                     ),
@@ -290,7 +495,7 @@ class _SportPrepScreenState extends State<SportPrepScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildActionGuides() {
@@ -401,8 +606,13 @@ class _SportPrepScreenState extends State<SportPrepScreen> {
 
 class SportAiCorrectionScreen extends StatelessWidget {
   final String sportType;
+  final CameraController? cameraController;
 
-  const SportAiCorrectionScreen({super.key, required this.sportType});
+  const SportAiCorrectionScreen({
+    super.key,
+    required this.sportType,
+    this.cameraController,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -423,26 +633,123 @@ class SportAiCorrectionScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFDFCF7),
-      body: Stack(
+      body: SafeArea(child: Stack(
         children: [
-          // 模拟相机背景
-          Positioned.fill(child: Container(color: Colors.black)),
-          // UI 层
-          SafeArea(
-            child: Column(
-              children: [
-                _buildTopInfo(context, actionName),
-                const Spacer(),
-                _buildCorrectionPanel(
-                  context,
-                  actionName,
-                  checkItems,
-                  suggestion,
+          // 相机背景
+          if (cameraController != null && cameraController!.value.isInitialized)
+            Positioned.fill(
+              child: ClipRRect(
+                child: SizedBox(
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: cameraController!.value.previewSize!.height,
+                      height: cameraController!.value.previewSize!.width,
+                      child: CameraPreview(cameraController!),
+                    ),
+                  ),
                 ),
-              ],
+              ),
+            )
+          else
+            Positioned.fill(child: Container(color: Colors.black)),
+          // UI 层
+          Column(
+            children: [
+              _buildTopInfo(context, actionName),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => _showBottomSheet(context, actionName, checkItems, suggestion),
+                child: Container(
+                  margin: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '姿态准确度',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E2939),
+                            ),
+                          ),
+                          const Text(
+                            '42%',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF3C9566),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '点击查看详情',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          )
+        ],
+      )),
+    );
+  }
+
+  void _showBottomSheet(BuildContext context, String actionName, List<String> checkItems, String suggestion) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.6,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(32),
+              topRight: Radius.circular(32),
             ),
           ),
-        ],
+          child: SingleChildScrollView(
+            controller: scrollController,
+            child: _buildCorrectionPanel(
+              context,
+              actionName,
+              checkItems,
+              suggestion,
+            ),
+          ),
+        ),
       ),
     );
   }

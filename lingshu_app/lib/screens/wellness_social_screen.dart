@@ -33,7 +33,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
           ),
         ),
       ),
-      body: ListView(
+      body: SafeArea(child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
         children: [
           _tabs(),
@@ -113,7 +113,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
             ),
           ],
         ],
-      ),
+      )),
     );
   }
 
@@ -134,7 +134,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
               borderRadius: BorderRadius.circular(16),
               onTap: () => setState(() => tab = index),
               child: Container(
-                height: 56,
+                height: 40,
                 decoration: BoxDecoration(
                   color: selected ? const Color(0xFF3C9566) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -158,7 +158,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
                       icons[index],
                       color: selected ? Colors.white : const Color(0xFF6F6256),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Text(
                       labels[index],
                       style: TextStyle(
@@ -166,7 +166,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
                             ? Colors.white
                             : const Color(0xFF6F6256),
                         fontFamily: 'STKaiti',
-                        fontSize: 16,
+                        fontSize: 12,
                         fontWeight: selected
                             ? FontWeight.bold
                             : FontWeight.normal,

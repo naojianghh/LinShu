@@ -53,11 +53,10 @@ class _CycleRecordScreenState extends State<CycleRecordScreen> {
               onPressed: _showRecordDialog,
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFF54888),
-                minimumSize: const Size(116, 56),
+                minimumSize: const Size(64, 56),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                elevation: 5,
               ),
               icon: const Icon(Icons.add, size: 20),
               label: const Text(
@@ -68,43 +67,45 @@ class _CycleRecordScreenState extends State<CycleRecordScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-        children: [
-          _buildStatsCard(),
-          const SizedBox(height: 22),
-          const Text(
-            '记录历史',
-            style: TextStyle(
-              fontSize: 36 / 2,
-              color: Color(0xFF244438),
-              fontFamily: 'STKaiti',
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _historyCard('2月25日', '5天', {'轻微痛经', '疲劳'}, '第一天状态尚可，第二天有些疲倦'),
-          const SizedBox(height: 14),
-          _historyCard('1月28日', '6天', {'痛经', '腰酸'}, '需要注意保暖'),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE6F6FB),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFA6DBE8)),
-            ),
-            child: const Text(
-              'AI 智能分析\n\n您的周期较为规律（平均28天），经期约6天。建议在经期前3天开始饮用姜枣茶，可有效缓解痛经症状。预计下次经期将在21天后到来。',
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+          children: [
+            _buildStatsCard(),
+            const SizedBox(height: 22),
+            const Text(
+              '记录历史',
               style: TextStyle(
-                fontSize: 15,
-                color: Color(0xFF3C4B46),
-                height: 1.6,
+                fontSize: 36 / 2,
+                color: Color(0xFF244438),
                 fontFamily: 'STKaiti',
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            _historyCard('2月25日', '5天', {'轻微痛经', '疲劳'}, '第一天状态尚可，第二天有些疲倦'),
+            const SizedBox(height: 14),
+            _historyCard('1月28日', '6天', {'痛经', '腰酸'}, '需要注意保暖'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6F6FB),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFA6DBE8)),
+              ),
+              child: const Text(
+                'AI 智能分析\n\n您的周期较为规律（平均28天），经期约6天。建议在经期前3天开始饮用姜枣茶，可有效缓解痛经症状。预计下次经期将在21天后到来。',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFF3C4B46),
+                  height: 1.6,
+                  fontFamily: 'STKaiti',
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

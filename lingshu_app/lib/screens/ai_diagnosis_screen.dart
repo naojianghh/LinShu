@@ -6,6 +6,7 @@ import 'dart:io';
 import '../models/diagnosis_report.dart';
 import '../services/diagnosis_report_db.dart';
 import '../services/qwen_service.dart';
+import '../widgets/app_header.dart';
 import '../widgets/banner_landscape_decoration.dart';
 import 'analysis_progress_screen.dart';
 import 'report_detail_screen.dart';
@@ -164,6 +165,7 @@ class _AiDiagnosisScreenState extends State<AiDiagnosisScreen> {
             parent: ClampingScrollPhysics(),
           ),
           slivers: [
+            const SliverToBoxAdapter(child: AppHeader()),
             SliverToBoxAdapter(child: _buildBanner(context)),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),

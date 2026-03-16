@@ -28,25 +28,27 @@ class ConstitutionTimelineScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-        children: [
-          Row(
-            children: [
-              Expanded(child: _switchBtn('月度报告', true)),
-              const SizedBox(width: 10),
-              Expanded(child: _switchBtn('季度报告', false)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _radarCard(),
-          const SizedBox(height: 14),
-          _achievementCard(),
-          const SizedBox(height: 14),
-          _trendCard(),
-          const SizedBox(height: 14),
-          _aiPredictCard(),
-        ],
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+          children: [
+            Row(
+              children: [
+                Expanded(child: _switchBtn('月度报告', true)),
+                const SizedBox(width: 10),
+                Expanded(child: _switchBtn('季度报告', false)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _radarCard(),
+            const SizedBox(height: 14),
+            _achievementCard(),
+            const SizedBox(height: 14),
+            _trendCard(),
+            const SizedBox(height: 14),
+            _aiPredictCard(),
+          ],
+        ),
       ),
     );
   }
@@ -440,7 +442,7 @@ class _MetricItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: const Color(0xFFFAFAF8),
         borderRadius: BorderRadius.circular(12),
