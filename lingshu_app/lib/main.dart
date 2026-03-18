@@ -21,7 +21,7 @@ Future<void> main() async {
     debugPrint('启动失败: $e');
     runApp(
       ScreenUtilInit(
-          designSize: const Size(375, 812),
+          designSize: const Size(416, 957),
           minTextAdapt: true,
           splitScreenMode: true,
           builder: (context, child) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -160,188 +161,208 @@ class _AiDiagnosisScreenState extends State<AiDiagnosisScreen> {
       color: const Color(0xFFFDFCF7),
       child: RefreshIndicator(
         onRefresh: _loadHistoryReports,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: ClampingScrollPhysics(),
+        child: Stack(
+          children: [
+            Positioned.fill(
+            child: SizedBox(
+            width: double.infinity,
+              height: double.infinity,
+              child: Expanded(
+                child: Image.asset(
+                  'assets/images/home_bg_1.png',
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
           ),
-          slivers: [
-            const SliverToBoxAdapter(child: AppHeader()),
-            SliverToBoxAdapter(child: _buildBanner(context)),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-              sliver: SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 56,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: ClampingScrollPhysics(),
+              ),
+              slivers: [
+                const SliverToBoxAdapter(child: AppHeader()),
+                SliverToBoxAdapter(child: _buildBanner(context)),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                  sliver: SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 56,
+                      child: Stack(
+                        clipBehavior: Clip.none,
                         children: [
-                          Text(
-                            'AI 望闻问切',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontFamily: 'STKaiti',
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2D4A3E),
-                            ),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'AI 望闻问切',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontFamily: 'FZZJ-LongYTJW',
+                                  fontWeight: FontWeight.w400,
+                                  color: Color(0xFF2D4A3E),
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                '通过智能分析，深度了解您的体质状况',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'STKaiti',
+                                  color: Color(0xFF6B5D4F),
+                                ),
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 4),
-                          Text(
-                            '通过智能分析，深度了解您的体质状况',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontFamily: 'STKaiti',
-                              color: Color(0xFF6B5D4F),
+                          Positioned(
+                            right: 20,
+                            bottom: -4,
+                            child: Image.asset(
+                              'assets/images/ornament_ai_book.png',
+                              width: 170,
+                              fit: BoxFit.contain,
                             ),
                           ),
                         ],
                       ),
-                      Positioned(
-                        right: 20,
-                        bottom: -4,
-                        child: Image.asset(
-                          'assets/images/ornament_ai_book.png',
-                          width: 170,
-                          fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      _buildDiagnosisCard(
+                        onTap: () => _startDiagnosis(context, 'face'),
+                        title: '面部望诊',
+                        desc: '通过AI视觉分析面部气色、光泽度和五官特征，评估气血状况',
+                        tags: const ['非接触式', '2分钟'],
+                        iconAsset: 'assets/images/ai_function_camera.png',
+                        bgGradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0x143C9566), Color(0x1F3C9566)],
                         ),
+                        borderColor: const Color(0x4D3C9566),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _buildDiagnosisCard(
-                    onTap: () => _startDiagnosis(context, 'face'),
-                    title: '面部望诊',
-                    desc: '通过AI视觉分析面部气色、光泽度和五官特征，评估气血状况',
-                    tags: const ['非接触式', '2分钟'],
-                    iconAsset: 'assets/images/diagnosis_icon_face.png',
-                    bgGradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0x143C9566), Color(0x1F3C9566)],
-                    ),
-                    borderColor: const Color(0x4D3C9566),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDiagnosisCard(
-                    onTap: () => _startDiagnosis(context, 'tongue'),
-                    title: '舌象分析',
-                    desc: '识别舌苔颜色、厚度、舌体形态，精准判断脏腑功能状态',
-                    tags: const ['高精度', '1分钟'],
-                    iconAsset: 'assets/images/diagnosis_icon_tongue.png',
-                    bgGradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFFFF1F2), Color(0xFFFDF2F8)],
-                    ),
-                    borderColor: const Color(0xFFFFCCD3),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDiagnosisCard(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const TextChatScreen(),
+                      const SizedBox(height: 12),
+                      _buildDiagnosisCard(
+                        onTap: () => _startDiagnosis(context, 'tongue'),
+                        title: '舌象分析',
+                        desc: '识别舌苔颜色、厚度、舌体形态，精准判断脏腑功能状态',
+                        tags: const ['高精度', '1分钟'],
+                        iconAsset: 'assets/images/ai_function_tongue.png',
+                        bgGradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFFFF1F2), Color(0xFFFDF2F8)],
                         ),
-                      );
-                    },
-                    title: '文本问答',
-                    desc: 'AI对话式问诊，输入症状、作息与饮食情况，获得个性化调理建议',
-                    tags: const ['多轮对话', '即时回复'],
-                    iconAsset: 'assets/images/diagnosis_icon_voice.png',
-                    bgGradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFEFF6FF), Color(0xFFECFEFF)],
-                    ),
-                    borderColor: const Color(0xFFBEDBFF),
-                  ),
-                ]),
-              ),
-            ),
-            const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 28, 16, 12),
-              sliver: SliverToBoxAdapter(
-                child: Text(
-                  '历史报告',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontFamily: 'STKaiti',
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D4A3E),
-                  ),
-                ),
-              ),
-            ),
-            if (_loadingHistory)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              )
-            else if (_historyReports.isEmpty)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                  child: Text(
-                    '暂无历史报告，快去做一次望闻问切吧。',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontFamily: 'STKaiti',
-                      color: Color(0xFF6B5D4F),
-                    ),
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final report = _historyReports[index];
-                    return Padding(
-                      padding: EdgeInsets.only(
-                        bottom: index == _historyReports.length - 1 ? 100 : 12,
+                        borderColor: const Color(0xFFFFCCD3),
                       ),
-                      child: GestureDetector(
+                      const SizedBox(height: 12),
+                      _buildDiagnosisCard(
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  ReportDetailScreen(report: report),
+                              builder: (context) => const TextChatScreen(),
                             ),
                           );
                         },
-                        child: _buildHistoryItem(
-                          title: report.type == 'tongue' ? '舌象分析报告' : '面部望诊报告',
-                          date:
-                              '${report.date.year}年${report.date.month}月${report.date.day}日',
-                          tag: report.constitution,
-                          tagBg: report.type == 'tongue'
-                              ? const Color(0xFFDBEAFE)
-                              : const Color(0x333C9566),
-                          tagFg: report.type == 'tongue'
-                              ? const Color(0xFF1447E6)
-                              : const Color(0xFF2D7450),
-                          leadingSvg: report.type == 'tongue'
-                              ? 'assets/images/diagnosis_history_report_blue.svg'
-                              : 'assets/images/diagnosis_history_report_green.svg',
+                        title: '文本问答',
+                        desc: 'AI对话式问诊，输入症状、作息与饮食情况，获得个性化调理建议',
+                        tags: const ['多轮对话', '即时回复'],
+                        iconAsset: 'assets/images/ai_function_chart.png',
+                        bgGradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFEFF6FF), Color(0xFFECFEFF)],
+                        ),
+                        borderColor: const Color(0xFFBEDBFF),
+                      ),
+                    ]),
+                  ),
+                ),
+                const SliverPadding(
+                  padding: EdgeInsets.fromLTRB(16, 28, 16, 12),
+                  sliver: SliverToBoxAdapter(
+                    child: Text(
+                      '历史报告',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontFamily: 'STKaiti',
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2D4A3E),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_loadingHistory)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  )
+                else if (_historyReports.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      child: Text(
+                        '暂无历史报告，快去做一次望闻问切吧。',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'STKaiti',
+                          color: Color(0xFF6B5D4F),
                         ),
                       ),
-                    );
-                  }, childCount: _historyReports.length),
-                ),
-              ),
-          ],
-        ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final report = _historyReports[index];
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == _historyReports.length - 1 ? 100 : 12,
+                          ),
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      ReportDetailScreen(report: report),
+                                ),
+                              );
+                            },
+                            child: _buildHistoryItem(
+                              title: report.type == 'tongue' ? '舌象分析报告' : '面部望诊报告',
+                              date:
+                                  '${report.date.year}年${report.date.month}月${report.date.day}日',
+                              tag: report.constitution,
+                              tagBg: report.type == 'tongue'
+                                  ? const Color(0xFFDBEAFE)
+                                  : const Color(0x333C9566),
+                              tagFg: report.type == 'tongue'
+                                  ? const Color(0xFF1447E6)
+                                  : const Color(0xFF2D7450),
+                              leadingSvg: report.type == 'tongue'
+                                  ? 'assets/images/diagnosis_history_report_blue.svg'
+                                  : 'assets/images/diagnosis_history_report_green.svg',
+                            ),
+                          ),
+                        );
+                      }, childCount: _historyReports.length),
+                    ),
+                  ),
+                SliverToBoxAdapter(
+                  child: SizedBox(height: 40.h,),
+                )
+              ],
+            ),
+          ]
+        )
       ),
     );
   }
@@ -387,32 +408,19 @@ class _AiDiagnosisScreenState extends State<AiDiagnosisScreen> {
     required Color borderColor,
   }) {
     final card = Container(
-      padding: const EdgeInsets.all(16),
+      height: 160.h,
+      padding: EdgeInsets.symmetric(horizontal: 25.w,vertical: 25.w),
       decoration: BoxDecoration(
-        gradient: bgGradient,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        image: DecorationImage(
+          image: AssetImage('assets/images/ai_function_bg.png'),
+          fit: BoxFit.fill
+        ),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Center(child: Image.asset(iconAsset, width: 28, height: 28)),
-          ),
-          const SizedBox(width: 16),
+          Image.asset(iconAsset, width: 60.w),
+          SizedBox(width: 16.w),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,8 +456,8 @@ class _AiDiagnosisScreenState extends State<AiDiagnosisScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFECEEF2),
-                            borderRadius: BorderRadius.circular(10),
+                            color: const Color(0xFFF7EBD6),
+                            borderRadius: BorderRadius.circular(32.r),
                           ),
                           child: Text(
                             t,

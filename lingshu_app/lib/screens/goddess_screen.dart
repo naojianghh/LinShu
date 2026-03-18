@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../services/user_health_bridge_service.dart';
 import '../widgets/app_header.dart';
@@ -77,7 +78,22 @@ class _GoddessScreenState extends State<GoddessScreen> {
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFFFDFCF7),
-      child: CustomScrollView(
+      child: Stack(
+        children: [
+      Positioned.fill(
+      child: SizedBox(
+      width: double.infinity,
+        height: double.infinity,
+        child: Expanded(
+          child: Image.asset(
+            'assets/images/home_bg_1.png',
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    ),
+      CustomScrollView(
         slivers: [
           const SliverToBoxAdapter(child: AppHeader()),
           SliverToBoxAdapter(child: _buildTopBanner()),
@@ -88,6 +104,10 @@ class _GoddessScreenState extends State<GoddessScreen> {
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            sliver: SliverToBoxAdapter(child: _entryGrid()),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
             sliver: SliverToBoxAdapter(child: _cycleCard()),
           ),
           SliverPadding(
@@ -99,16 +119,14 @@ class _GoddessScreenState extends State<GoddessScreen> {
             sliver: SliverToBoxAdapter(child: _recommendCard()),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
             sliver: SliverToBoxAdapter(child: _tipsCard()),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-            sliver: SliverToBoxAdapter(child: _entryGrid()),
-          ),
+
         ],
       ),
-    );
+    ]
+    ));
   }
 
   Widget _buildTopBanner() {
@@ -176,11 +194,11 @@ class _GoddessScreenState extends State<GoddessScreen> {
               ],
             ),
             Positioned(
-              right: 0,
-              top: -10,
+              right: -6.w,
+              top: -64.h,
               child: Image.asset(
-                'assets/images/ornament_goddess_teapot.png',
-                width: 52,
+                'assets/images/god_decoration.png',
+                height: 190.h,
                 fit: BoxFit.contain,
               ),
             ),
@@ -228,6 +246,10 @@ class _GoddessScreenState extends State<GoddessScreen> {
                         ]
                       : null,
                   borderRadius: BorderRadius.circular(10),
+                  border: selected ? BoxBorder.all(
+                    color: const Color(0xFF6B5D4F),
+                    width: 1.r
+                      ) : null
                 ),
                 child: Text(
                   labels[i],
@@ -251,85 +273,80 @@ class _GoddessScreenState extends State<GoddessScreen> {
     final phase = _insights?.cyclePhase ?? '卵泡期';
     final constitution = _insights?.latestReport?.constitution ?? '待分析';
     return Container(
-      padding: const EdgeInsets.fromLTRB(17, 17, 17, 12),
+      height: 220.h,
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(33.w, 44.h,33.w, 0),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFEEF3), Color(0xFFFFF5F8)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF8BBD0), width: 1.15),
+       image: DecorationImage(image: AssetImage('assets/images/cycle_card_bg.png'),fit: BoxFit.fill)
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFF4D8C),
-                  shape: BoxShape.circle,
+          SizedBox(
+            height: 42.h,
+            child: Row(
+              children: [
+                Image.asset('assets/images/cycle_card_icon.png', width: 36.w,),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$phase · $constitution',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          color: Color(0xFF2D4A3E),
+                          fontFamily: 'STKaiti',
+                        ),
+                      ),
+                      Text(
+                        '当前周期阶段',
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          color: Color(0xFF8B7D6B),
+                          fontFamily: 'STKaiti',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: const Center(
-                  child: Text('📅', style: TextStyle(fontSize: 12)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '当前周期阶段',
+                SizedBox(
+                  height: 30.h,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFF8BBD0), width: 1.15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                    ),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CycleRecordScreen()),
+                    ),
+                    child: Text(
+                      '记录月经',
                       style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF8B7D6B),
+                        fontSize: 11.sp,
+                        color: Color(0xFFFF4D8C),
                         fontFamily: 'STKaiti',
                       ),
                     ),
-                    Text(
-                      '$phase · $constitution',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF2D4A3E),
-                        fontFamily: 'STKaiti',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFF8BBD0), width: 1.15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CycleRecordScreen()),
-                ),
-                child: const Text(
-                  '记录月经',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFFFF4D8C),
-                    fontFamily: 'STKaiti',
-                  ),
-                ),
-              ),
-            ],
+                )
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 9.h),
           Container(
+            height: 80.h,
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color.fromRGBO(255, 255, 255, .6),
+              color: const Color(0xFFFFE9EF),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -344,16 +361,6 @@ class _GoddessScreenState extends State<GoddessScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: const LinearProgressIndicator(
-                    value: .22,
-                    minHeight: 6,
-                    backgroundColor: Color(0xFFFFF0E8),
-                    valueColor: AlwaysStoppedAnimation(Color(0xFFFF8E53)),
-                  ),
-                ),
-                const SizedBox(height: 6),
                 const Align(
                   alignment: Alignment.centerRight,
                   child: Text(
@@ -363,6 +370,16 @@ class _GoddessScreenState extends State<GoddessScreen> {
                       color: Color(0xFF8B7D6B),
                       fontFamily: 'STKaiti',
                     ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: const LinearProgressIndicator(
+                    value: .22,
+                    minHeight: 6,
+                    backgroundColor: Color(0xFFFFFFFF),
+                    valueColor: AlwaysStoppedAnimation(Color(0xFFFF8E53)),
                   ),
                 ),
               ],
@@ -376,12 +393,41 @@ class _GoddessScreenState extends State<GoddessScreen> {
   Widget _calendarCard() {
     const weekLabels = ['日', '一', '二', '三', '四', '五', '六'];
 
-    Color bgForDay(int day) {
-      if (day >= 1 && day <= 10) return const Color(0xFFF4DDE7);
-      if (day >= 11 && day <= 13) return const Color(0xFFF4E8D4);
-      if (day >= 14 && day <= 25) return const Color(0xFFE9DEEF);
-      if (day >= 26 && day <= 31) return const Color(0xFFF1CDD9);
-      return const Color(0xFFF4DDE7);
+    LinearGradient bgForDay(int day) {
+      if (day >= 1 && day <= 10) {
+        return const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFFFD6E0), Color(0xFFFFD6E0)],
+      );
+      } else if (day >= 11 && day <= 13) {
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF3E0), Color(0xFFFFF3E0)],
+        );
+      }
+      else if (day >= 14 && day <= 25) {
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF3E5F5), Color(0xFFF3E5F5)],
+        );
+      }
+      else if (day >= 26 && day <= 31) {
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFD6E0), Color(0xFFFFD6E0)],
+        );
+      }
+      else {
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF6FB08E), Color(0xFF83C6A2)],
+        );
+      }
     }
 
     Color textForDay(int day) {
@@ -396,11 +442,10 @@ class _GoddessScreenState extends State<GoddessScreen> {
     bool showStar(int day) => [11, 12, 13].contains(day);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8DCC8), width: 1.15),
+        image: DecorationImage(image: AssetImage('assets/images/calendar_bg.png',), fit: BoxFit.fitWidth)
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,43 +455,52 @@ class _GoddessScreenState extends State<GoddessScreen> {
             style: TextStyle(
               fontSize: 17,
               color: Color(0xFF2D4A3E),
-              fontFamily: 'STKaiti',
+              fontFamily: 'FZZJ-LongYTJW',
             ),
           ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: weekLabels
-                .map(
-                  (label) => Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF8B7D6B),
-                      fontFamily: 'STKaiti',
-                    ),
+          SizedBox(height: 12.h),
+          SizedBox(
+            height: 25.h,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: weekLabels
+                  .map(
+                    (label) => Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF8B7D6B),
+                    fontFamily: 'STKaiti',
                   ),
-                )
-                .toList(),
+                ),
+              )
+                  .toList(),
+            ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 8.h),
           GridView.builder(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: 31,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              mainAxisExtent: 58,
+              crossAxisSpacing: 4.w,
+              mainAxisSpacing: 4.h,
             ),
             itemBuilder: (context, index) {
               final day = index + 1;
               final isToday = day == 5;
               return Container(
+                width: 40.w,
+                height: 40.w,
                 decoration: BoxDecoration(
-                  color: isToday ? const Color(0xFF3C9566) : bgForDay(day),
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: isToday ? const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF6FB08E), Color(0xFF83C6A2)],
+                  ) : bgForDay(day),
+                  borderRadius: BorderRadius.circular(8.r),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -487,16 +541,22 @@ class _GoddessScreenState extends State<GoddessScreen> {
             },
           ),
           const SizedBox(height: 12),
-          const Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              _LegendItem(color: Color(0xFFF1CDD9), text: '经期 (1-5天)'),
-              _LegendItem(color: Color(0xFFF4DDE7), text: '卵泡期 (6-13天)'),
-              _LegendItem(color: Color(0xFFF4E8D4), text: '排卵期 (14-16天)'),
-              _LegendItem(color: Color(0xFFE9DEEF), text: '黄体期 (17-28天)'),
-            ],
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 18),
+            child: Align(
+              alignment: Alignment.center,
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  _LegendItem(color: Color(0xFFF1CDD9), text: '经期 (1-5天)'),
+                  _LegendItem(color: Color(0xFFF4DDE7), text: '卵泡期 (6-13天)'),
+                  _LegendItem(color: Color(0xFFF4E8D4), text: '排卵期 (14-16天)'),
+                  _LegendItem(color: Color(0xFFE9DEEF), text: '黄体期 (17-28天)'),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -507,6 +567,7 @@ class _GoddessScreenState extends State<GoddessScreen> {
     final mealPlans = _insights?.goddessPlan.dietaryPlan ?? const [];
 
     Widget meal(String t, String c, String d, String action) {
+      bool isRecommend = action == '智能推荐';
       return Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(12),
@@ -534,23 +595,26 @@ class _GoddessScreenState extends State<GoddessScreen> {
                     horizontal: 10,
                     vertical: 4,
                   ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F6F0),
+                  decoration: isRecommend ? BoxDecoration(
+                    color: const Color(0xFFFFFFFF),
                     borderRadius: BorderRadius.circular(7),
-                    border: Border.all(color: const Color(0xFFBFDEC7)),
+                    border: Border.all(color: const Color(0xFFD4EAD9)),
+                  ) : BoxDecoration(
+                    color: const Color(0xFFFFFFFF),
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(color: const Color(0xFFE8DCC8)),
                   ),
                   child: Text(
                     action,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: Color(0xFF4D8F67),
+                      color: isRecommend ? const Color(0xFF3C9566) : const Color(0xFF8B7D6B),
                       fontFamily: 'STKaiti',
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 5),
             Text(
               c,
               style: const TextStyle(
@@ -574,15 +638,10 @@ class _GoddessScreenState extends State<GoddessScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(17),
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(24, 28, 24, 28),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFFFFF), Color(0xFFFDFCF7)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8DCC8), width: 1.15),
+          image: DecorationImage(image: AssetImage('assets/images/calendar_bg.png'), fit: BoxFit.fill)
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,7 +651,7 @@ class _GoddessScreenState extends State<GoddessScreen> {
             style: TextStyle(
               fontSize: 16,
               color: Color(0xFF2D4A3E),
-              fontFamily: 'STKaiti',
+              fontFamily: 'FZZJ-LongYTJW',
             ),
           ),
           const SizedBox(height: 10),
@@ -622,13 +681,9 @@ class _GoddessScreenState extends State<GoddessScreen> {
   Widget _tipsCard() {
     final tips = _insights?.goddessPlan.wellnessRecommendation ?? const [];
     return Container(
-      padding: const EdgeInsets.all(17),
+      padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 28.h),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE8F5F7), Color(0xFFF0F8F9)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFB2DFDB), width: 1.15),
+        image: DecorationImage(image: AssetImage('assets/images/ai_function_bg.png'), fit: BoxFit.fill)
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -641,7 +696,7 @@ class _GoddessScreenState extends State<GoddessScreen> {
               color: Color(0xFF2D4A3E),
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 9.h),
           Text(
             '• ${tips.isNotEmpty ? tips[0] : '主旨为多艺这道食道的平时，红枣、莲子、大少红枣'}',
             style: const TextStyle(
@@ -650,7 +705,7 @@ class _GoddessScreenState extends State<GoddessScreen> {
               color: Color(0xFF476052),
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 8.h),
           Text(
             '• ${tips.length > 1 ? tips[1] : '在上血流量充盈的食用，主菜、水果粥、一般量'}',
             style: const TextStyle(
@@ -659,7 +714,7 @@ class _GoddessScreenState extends State<GoddessScreen> {
               color: Color(0xFF476052),
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 8.h),
           Text(
             '• ${tips.length > 2 ? tips[2] : '豆类适合各，别吃鱼、花生等，有水与不相同作用所营养'}',
             style: const TextStyle(
@@ -687,65 +742,49 @@ class _GoddessScreenState extends State<GoddessScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          height: 126,
-          padding: const EdgeInsets.fromLTRB(17, 14, 12, 10),
+          height: 81.h,
+          width: 186.w,
+          padding: EdgeInsets.symmetric(horizontal: 16.w),
           decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [bg, Colors.white]),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: border, width: 1.15),
+            image: DecorationImage(image: AssetImage('assets/images/health_bg.png'), fit: BoxFit.fill),
           ),
           child: Stack(
+            alignment: Alignment.center,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: .08),
-                          blurRadius: 3,
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        iconEmoji,
-                        style: const TextStyle(fontSize: 20),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF2D4A3E),
-                      fontFamily: 'STKaiti',
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    desc,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      color: Color(0xFF8B7D6B),
-                      fontFamily: 'STKaiti',
-                    ),
-                  ),
-                ],
-              ),
               Positioned(
                 right: 0,
-                bottom: 0,
+                child: SizedBox(
+                  height: 42.h,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF2D4A3E),
+                          fontFamily: 'STKaiti',
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        desc,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: Color(0xFF8B7D6B),
+                          fontFamily: 'STKaiti',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
                 child: Image.asset(
                   imagePath,
-                  width: 64,
-                  height: 64,
+                  width: 44.w,
+                  height: 60.h,
                   fit: BoxFit.contain,
                 ),
               ),
@@ -755,82 +794,85 @@ class _GoddessScreenState extends State<GoddessScreen> {
       );
     }
 
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: card(
-                bg: const Color(0xFFFFEEF3),
-                border: const Color(0xFFF8BBD0),
-                title: '生理周期记录',
-                desc: '智能预测周期变化',
-                iconEmoji: '📅',
-                imagePath: 'assets/images/goddess_new/entry_cycle.png',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CycleRecordScreen()),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: card(
-                bg: const Color(0xFFE8F5E9),
-                border: const Color(0xFFA5D6A7),
-                title: '智能饮品推荐',
-                desc: 'AI体质周期精准匹配',
-                iconEmoji: '🍵',
-                imagePath: 'assets/images/goddess_new/entry_drink.png',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DrinkRecommendScreen(),
+    return SizedBox(
+      height: 178.h,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: card(
+                  bg: const Color(0xFFFFEEF3),
+                  border: const Color(0xFFF8BBD0),
+                  title: '生理周期记录',
+                  desc: '智能预测周期变化',
+                  iconEmoji: '📅',
+                  imagePath: 'assets/images/goddess_new/entry_cycle.png',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CycleRecordScreen()),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: card(
-                bg: const Color(0xFFE8EAF6),
-                border: const Color(0xFF9FA8DA),
-                title: '体质演化分析',
-                desc: '可视化健康趋势预测',
-                iconEmoji: '📊',
-                imagePath: 'assets/images/goddess_new/entry_timeline.png',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ConstitutionTimelineScreen(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: card(
+                  bg: const Color(0xFFE8F5E9),
+                  border: const Color(0xFFA5D6A7),
+                  title: '智能饮品推荐',
+                  desc: 'AI体质周期精准匹配',
+                  iconEmoji: '🍵',
+                  imagePath: 'assets/images/goddess_new/entry_drink.png',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DrinkRecommendScreen(),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: card(
-                bg: const Color(0xFFFFEBEE),
-                border: const Color(0xFFEF9A9A),
-                title: '养生社交',
-                desc: '拼单监督礼物赠送',
-                iconEmoji: '👭',
-                imagePath: 'assets/images/goddess_new/entry_social.png',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const WellnessSocialScreen(),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: card(
+                  bg: const Color(0xFFE8EAF6),
+                  border: const Color(0xFF9FA8DA),
+                  title: '体质演化分析',
+                  desc: '可视化健康趋势预测',
+                  iconEmoji: '📊',
+                  imagePath: 'assets/images/goddess_new/entry_timeline.png',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ConstitutionTimelineScreen(),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: card(
+                  bg: const Color(0xFFFFEBEE),
+                  border: const Color(0xFFEF9A9A),
+                  title: '养生社交',
+                  desc: '拼单监督礼物赠送',
+                  iconEmoji: '👭',
+                  imagePath: 'assets/images/goddess_new/entry_social.png',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const WellnessSocialScreen(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

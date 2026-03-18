@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/five_tone_track.dart';
 import '../services/five_tone_service.dart';
@@ -128,64 +129,134 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFFFDFCF7),
-      child: CustomScrollView(
+      child: Stack(
+        children: [
+      Positioned.fill(
+      child: SizedBox(
+      width: double.infinity,
+        height: double.infinity,
+        child: Expanded(
+          child: Image.asset(
+            'assets/images/home_bg_1.png',
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    ),
+      CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(
           parent: ClampingScrollPhysics(),
         ),
         slivers: [
           const SliverToBoxAdapter(child: AppHeader()),
           SliverToBoxAdapter(child: _buildTopBanner()),
+          SliverToBoxAdapter(child: SizedBox(height: 12.h,),),
           SliverToBoxAdapter(child: _buildPageTitle()),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 16),
             sliver: SliverToBoxAdapter(child: _buildMoodAssessmentCard()),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
-            sliver: SliverToBoxAdapter(child: _buildSectionTitle('中医五音疗愈')),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _buildFiveToneItem(
-                  '宫音',
-                  '入脾 · 缓解焦虑，补益中气',
-                  'assets/images/meditation_icon_gong.svg',
+            padding: const EdgeInsets.symmetric(vertical: 0),
+            sliver: SliverToBoxAdapter(
+              child: Container(
+                  padding: EdgeInsets.symmetric(vertical: 36.h,horizontal: 32.w),
+                decoration: BoxDecoration(
+                  image: DecorationImage(image: AssetImage('assets/images/calendar_bg.png'),fit: BoxFit.fill)
                 ),
-                const SizedBox(height: 12),
-                _buildFiveToneItem(
-                  '商音',
-                  '入肺 · 醒脑提神，清肺润燥',
-                  'assets/images/meditation_icon_shang.svg',
-                ),
-                const SizedBox(height: 12),
-                _buildFiveToneItem(
-                  '角音',
-                  '入肝 · 疏肝理气，调畅气机',
-                  'assets/images/meditation_icon_jue.svg',
-                ),
-                const SizedBox(height: 12),
-                _buildFiveToneItem(
-                  '徵音',
-                  '入心 · 养心安神，清心降火',
-                  'assets/images/meditation_icon_zhi.svg',
-                ),
-                const SizedBox(height: 12),
-                _buildFiveToneItem(
-                  '羽音',
-                  '入肾 · 滋阴降火，宁心安神',
-                  'assets/images/meditation_icon_yu.svg',
-                ),
-              ]),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '中医五音疗愈',
+                          style: TextStyle(
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF2D4A3E),
+                            fontFamily: 'FZZJ-LongYTJW',
+                          ),
+                        ),
+                        Image.asset('assets/images/meditation_decoration.png',width: 128.w,)
+                      ],
+                    ),
+                    SizedBox(height: 16.h),
+                    Row(
+                      children: [
+                        Text(
+                          '根据您的体质推荐',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF6B5D4F),
+                            fontFamily: 'STKaiti',
+                          ),
+                        ),
+                        const Expanded(child: SizedBox()),
+                        Container(
+                          height: 30.h,
+                          alignment: Alignment.center,
+                          padding: EdgeInsets.symmetric(horizontal: 12.w),
+                          decoration: BoxDecoration(
+                            color: Color(0xFFDDF2E8),
+                            borderRadius: BorderRadius.circular(10.r),
+                            border: Border.all(color: const Color(0xFFA4D4B4)),
+                          ),
+                          child: Text(
+                            '基于平和质',
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color: Color(0xFF2D7450),
+                              fontFamily: 'STKaiti',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16.h,),
+                    _buildFiveToneItem(
+                      '宫音',
+                      '入脾', '缓解焦虑，补益中气', '适用于：晨起唤醒',
+                      'assets/images/meditation_gong.png',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildFiveToneItem(
+                      '商音',
+                      '入肺','醒脑提神，清肺润燥','适用于：白天醒脑',
+                      'assets/images/meditation_shang.png',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildFiveToneItem(
+                      '角音',
+                      '入肝', '疏肝理气，调畅气机','适用于：肝气舒缓',
+                      'assets/images/meditation_jue.png',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildFiveToneItem(
+                      '徵音',
+                      '入心', '养心安神，清心降火','适用于：心神宁静',
+                      'assets/images/meditation_zhi.png',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildFiveToneItem(
+                      '羽音',
+                      '入肾', '滋阴降火，宁心安神','适用于：仙境酣眠',
+                      'assets/images/meditation_yu.png',
+                    ),
+                  ],
+                )
+              ),
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
             sliver: SliverToBoxAdapter(child: _buildSectionTitle('冥想引导')),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _buildMeditationGuideItem(
@@ -210,7 +281,7 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
           ),
         ],
       ),
-    );
+    ]));
   }
 
   Widget _buildTopBanner() {
@@ -263,9 +334,9 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
                   '心灵栖息地',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w400,
                     color: Color(0xFF2D4A3E),
-                    fontFamily: 'STKaiti',
+                    fontFamily: 'FZZJ-LongYTJW',
                   ),
                 ),
                 SizedBox(height: 4),
@@ -280,11 +351,11 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
               ],
             ),
             Positioned(
-              right: 2,
-              bottom: -8,
+              right: 0,
+              bottom: -20.h,
               child: Image.asset(
-                'assets/images/ornament_meditation_lotus.png',
-                width: 54,
+                'assets/images/meditation_lotus.png',
+                width: 100.w,
                 fit: BoxFit.contain,
               ),
             ),
@@ -296,18 +367,9 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
 
   Widget _buildMoodAssessmentCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.symmetric(vertical: 28.h,horizontal: 30.w),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3E8FF).withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFDDD6FE), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF7C3AED).withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        image: DecorationImage(image: AssetImage('assets/images/calendar_bg.png'), fit: BoxFit.fill)
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,24 +380,26 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
                 '心理状态评估',
                 style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF5B21B6),
-                  fontFamily: 'STKaiti',
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF2D4A3E),
+                  fontFamily: 'FZZJ-LongYTJW',
                 ),
               ),
-              const SizedBox(width: 8),
+              const Expanded(child: SizedBox()),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                height: 30.h,
+                alignment: Alignment.center,
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFDDD6FE)),
+                  color: Color(0xFFDDF2E8),
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: const Color(0xFFA4D4B4)),
                 ),
-                child: const Text(
+                child: Text(
                   '基于AI分析',
                   style: TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF5B21B6),
+                    fontSize: 12.sp,
+                    color: Color(0xFF2D7450),
                     fontFamily: 'STKaiti',
                   ),
                 ),
@@ -343,29 +407,32 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
+          SizedBox(
+            height: 80.h,
+            child: Row(
             children: [
               _buildAssessmentItem(
                 '压力指数',
                 (_mindPlan?.stressIndex ?? 68).toString(),
-                const Color(0xFFC75B7A),
-                'assets/images/meditation_eval_stress.svg',
+                const Color(0xFF2D4A3E),
+                'assets/images/meditation_press.png',
               ),
               const SizedBox(width: 16),
               _buildAssessmentItem(
                 '放松度',
                 '${_mindPlan?.relaxPercent ?? 85}%',
-                const Color(0xFF6366F1),
-                'assets/images/meditation_eval_relax.svg',
+                const Color(0xFF2D4A3E),
+                'assets/images/meditation_relax.png',
               ),
             ],
-          ),
+          ),),
+
           const SizedBox(height: 16),
           Text(
             _mindPlan?.suggestion ?? '您今日的压力值偏高，建议聆听舒缓音乐或进行冥想练习',
             style: const TextStyle(
               fontSize: 13,
-              color: Color(0xFF5B21B6),
+              color: Color(0xFF2D4A3E),
               fontFamily: 'STKaiti',
             ),
           ),
@@ -382,38 +449,33 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
   ) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(14),
+          border: BoxBorder.all(color: const Color(0xFFE8DCC8), width: 1.w)
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: SvgPicture.asset(svgPath, width: 18, height: 18),
-            ),
+            Image.asset(svgPath, width: 40.w, height: 40.w),
             const SizedBox(width: 10),
             Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF6B5D4F),
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: const Color(0xFF6B5D4F),
                     fontFamily: 'STKaiti',
                   ),
                 ),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w400,
                     color: color,
                   ),
                 ),
@@ -428,24 +490,25 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
   Widget _buildSectionTitle(String title) {
     return Row(
       children: [
-        Container(
-          width: 4,
-          height: 16,
-          decoration: BoxDecoration(
-            color: const Color(0xFF3C9566),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 17,
+          style: TextStyle(
+            fontSize: 16.sp,
             color: Color(0xFF2D4A3E),
-            fontWeight: FontWeight.bold,
-            fontFamily: 'STKaiti',
+            fontWeight: FontWeight.w400,
+            fontFamily: 'FZZJ-LongYTJW',
           ),
         ),
+        Expanded(child: SizedBox()),
+        Text(
+          '查看全部',
+          style: TextStyle(
+            color: const Color(0xFF3C9566),
+            fontSize: 14.sp,
+            fontFamily: 'STKaiti'
+          ),
+        )
       ],
     );
   }
@@ -488,9 +551,9 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
     }
   }
 
-  Widget _buildFiveToneItem(String name, String desc, String svgPath) {
+  Widget _buildFiveToneItem(String name, String desc1, String desc2,String desc3, String svgPath) {
     return GestureDetector(
-      onTap: () => _openToneMusic(name, desc),
+      onTap: () => _openToneMusic(name, desc1),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -503,36 +566,52 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
         ),
         child: Row(
           children: [
-            SvgPicture.asset(svgPath, width: 40, height: 40),
+            Image.asset(svgPath, width: 64.w, height: 64.w),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w400,
+                        color: Color(0xFF2D4A3E),
+                        fontFamily: 'STKaiti',
+                      ),
+                    ),
+                      SizedBox(width: 8.w,),
+                      Text(
+                        desc1,
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Color(0xFF6B5D4F),
+                          fontFamily: 'STKaiti',
+                        ),
+                      ),],
+                  ),
+
                   Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2D4A3E),
+                    desc2,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: Color(0xFF6B5D4F),
                       fontFamily: 'STKaiti',
                     ),
                   ),
                   Text(
-                    desc,
-                    style: const TextStyle(
-                      fontSize: 12,
+                    desc3,
+                    style: TextStyle(
+                      fontSize: 12.sp,
                       color: Color(0xFF6B5D4F),
                       fontFamily: 'STKaiti',
                     ),
                   ),
                 ],
               ),
-            ),
-            const Icon(
-              Icons.play_circle_outline,
-              color: Color(0xFF3C9566),
-              size: 28,
             ),
           ],
         ),
@@ -568,26 +647,9 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.only(left: 28.w,right: 28.w,top: 32.h,bottom: 16.h),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color.fromRGBO(255, 254, 251, 0.95),
-              Color.fromRGBO(248, 246, 240, 0.95),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE8DCC8), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          image: DecorationImage(image: AssetImage('assets/images/meditation_bg.png'),fit: BoxFit.fill)
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -608,18 +670,18 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w400,
                       color: Color(0xFF2D4A3E),
                       fontFamily: 'STKaiti',
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     desc.split(' · ').last,
-                    style: const TextStyle(
-                      fontSize: 13,
+                    style: TextStyle(
+                      fontSize: 14.sp,
                       color: Color(0xFF6B5D4F),
                       fontFamily: 'STKaiti',
                       height: 1.4,
@@ -627,7 +689,7 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -645,17 +707,15 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF3C9566),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                            const Color(0xFF6FB08E),
+                            const Color(0xFF83C6A2),
+                          ]),
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(
-                                0xFF3C9566,
-                              ).withValues(alpha: 0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          border: BoxBorder.all(color: Color(0xFF2D7450),width: 1.r)
                         ),
                         child: const Text(
                           '开始体验',

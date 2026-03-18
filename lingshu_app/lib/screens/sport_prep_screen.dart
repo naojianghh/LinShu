@@ -604,7 +604,7 @@ class _SportPrepScreenState extends State<SportPrepScreen> {
   }
 }
 
-class SportAiCorrectionScreen extends StatelessWidget {
+class SportAiCorrectionScreen extends StatefulWidget {
   final String sportType;
   final CameraController? cameraController;
 
@@ -615,20 +615,207 @@ class SportAiCorrectionScreen extends StatelessWidget {
   });
 
   @override
+  State<SportAiCorrectionScreen> createState() => _SportAiCorrectionScreenState();
+}
+
+class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
+  late PoseDetector _poseDetector;
+  bool _isDetecting = false;
+  
+  Pose? _currentPose;
+  double _poseAccuracy = 0.0;
+  Map<String, bool> _checkResults = {};
+  String _currentSuggestion = '';
+  
+  @override
+  void initState() {
+    super.initState();
+    _initDetector();
+  }
+  
+  void _initDetector() {
+    _poseDetector = PoseDetector(
+      options: PoseDetectorOptions(mode: PoseDetectionMode.stream),
+    );
+    Log.d('启动动作检测流', tag: 'analyzePose');
+    _startPoseDetectionStream();
+  }
+  
+  void _startPoseDetectionStream() {
+    if (widget.cameraController == null || !widget.cameraController!.value.isInitialized) {
+      Log.d('启动动作检测流失败 widget.cameraController == null: ${widget.cameraController == null} !widget.cameraController!.value.isInitialized: ${!widget.cameraController!.value.isInitialized}', tag: 'analyzePose');
+      return;
+    }
+    
+    widget.cameraController!.startImageStream((CameraImage image) async {
+      if (_isDetecting) return;
+      _isDetecting = true;
+      
+      try {
+        final inputImage = _convertCameraImage(image);
+        if (inputImage == null) return;
+        
+        final poses = await _poseDetector.processImage(inputImage);
+        
+        if (poses.isNotEmpty) {
+          _currentPose = poses.first;
+          Log.d('开始分析动作', tag: 'analyzePose');
+          _analyzePose(_currentPose!);
+        } else {
+          _currentPose = null;
+        }
+        
+        if (mounted) setState(() {});
+      } catch (e) {
+        Log.e('检测错误：$e', tag: 'Pose');
+      } finally {
+        _isDetecting = false;
+      }
+    });
+  }
+  
+  InputImage? _convertCameraImage(CameraImage image) {
+    try {
+      final camera = widget.cameraController!.description;
+      
+      final sensorOrientation = camera.sensorOrientation;
+      
+      InputImageRotation rotation;
+      if (Platform.isIOS) {
+        rotation = InputImageRotation.rotation90deg;
+      } else {
+        final isFrontCamera = camera.lensDirection == CameraLensDirection.front;
+        if (sensorOrientation == 90) {
+          rotation = isFrontCamera ? InputImageRotation.rotation270deg : InputImageRotation.rotation90deg;
+        } else if (sensorOrientation == 270) {
+          rotation = isFrontCamera ? InputImageRotation.rotation90deg : InputImageRotation.rotation270deg;
+        } else if (sensorOrientation == 0) {
+          rotation = InputImageRotation.rotation0deg;
+        } else {
+          rotation = InputImageRotation.rotation180deg;
+        }
+      }
+      
+      InputImageFormat format;
+      if (image.format.group == ImageFormatGroup.nv21) {
+        format = InputImageFormat.nv21;
+      } else {
+        format = InputImageFormat.yuv_420_888;
+      }
+      
+      final yPlane = image.planes[0];
+      
+      return InputImage.fromBytes(
+        bytes: yPlane.bytes,
+        metadata: InputImageMetadata(
+          size: Size(image.width.toDouble(), image.height.toDouble()),
+          rotation: rotation,
+          format: format,
+          bytesPerRow: yPlane.bytesPerRow,
+        ),
+      );
+    } catch (e) {
+      Log.e('图像转换错误: $e', tag: 'Pose');
+      return null;
+    }
+  }
+  
+  void _analyzePose(Pose pose) {
+    _checkResults = {};
+    double totalScore = 0;
+    int checkCount = 0;
+    
+    // 获取关键点
+    final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = pose.landmarks[PoseLandmarkType.rightShoulder];
+    final leftElbow = pose.landmarks[PoseLandmarkType.leftElbow];
+    final rightElbow = pose.landmarks[PoseLandmarkType.rightElbow];
+    final leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
+    final rightWrist = pose.landmarks[PoseLandmarkType.rightWrist];
+    final nose = pose.landmarks[PoseLandmarkType.nose];
+    
+    Log.d('运动类型: ${widget.sportType}', tag: 'analyzePose');
+    Log.d('左肩膀: ${leftShoulder?.x}, ${leftShoulder?.y}', tag: 'analyzePose');
+    Log.d('右肩膀: ${rightShoulder?.x}, ${rightShoulder?.y}', tag: 'analyzePose');
+    Log.d('左手腕: ${leftWrist?.x}, ${leftWrist?.y}', tag: 'analyzePose');
+    Log.d('右手腕: ${rightWrist?.x}, ${rightWrist?.y}', tag: 'analyzePose');
+    Log.d('鼻子: ${nose?.x}, ${nose?.y}', tag: 'analyzePose');
+    
+    // 根据运动类型分析
+    if (widget.sportType == '八段锦') {
+      // 双手托天理三焦
+      if (leftWrist != null && rightWrist != null && leftShoulder != null && rightShoulder != null) {
+        final wristY = (leftWrist.y + rightWrist.y) / 2;
+        final shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+        final isArmsUp = wristY < shoulderY;
+        _checkResults['手臂伸展'] = isArmsUp;
+        totalScore += isArmsUp ? 1.0 : 0.3;
+        checkCount++;
+        Log.d('手臂伸展: $isArmsUp, 手腕Y=$wristY, 肩膀Y=$shoulderY', tag: 'analyzePose');
+      }
+      
+      if (nose != null && leftShoulder != null && rightShoulder != null) {
+        final shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+        final isStraight = (nose.x - shoulderCenterX).abs() < 50;
+        _checkResults['腰背挺直'] = isStraight;
+        totalScore += isStraight ? 1.0 : 0.5;
+        checkCount++;
+        Log.d('腰背挺直: $isStraight, 鼻子X=${nose.x}, 肩膀中心X=$shoulderCenterX', tag: 'analyzePose');
+      }
+    } else if (widget.sportType == '瑜伽') {
+      if (leftElbow != null && rightElbow != null && leftWrist != null && rightWrist != null) {
+        _checkResults['四肢支撑'] = true;
+        totalScore += 1.0;
+        checkCount++;
+        Log.d('四肢支撑: true', tag: 'analyzePose');
+      }
+    } else if (widget.sportType == '太极拳') {
+      if (leftShoulder != null && rightShoulder != null) {
+        _checkResults['转腰带动'] = true;
+        totalScore += 1.0;
+        checkCount++;
+        Log.d('转腰带动: true', tag: 'analyzePose');
+      }
+    }
+    
+    _poseAccuracy = checkCount > 0 ? (totalScore / checkCount) * 100 : 0;
+    
+    Log.d('检查项: $_checkResults', tag: 'analyzePose');
+    Log.d('准确度: ${_poseAccuracy.toStringAsFixed(1)}%', tag: 'analyzePose');
+    
+    if (_poseAccuracy >= 80) {
+      _currentSuggestion = '姿势标准，继续保持！';
+    } else if (_poseAccuracy >= 50) {
+      _currentSuggestion = '姿势基本正确，可适当调整';
+    } else {
+      _currentSuggestion = '请调整姿势，按提示纠正';
+    }
+    
+    Log.d('提示: $_currentSuggestion', tag: 'analyzePose');
+  }
+  
+  @override
+  void dispose() {
+    widget.cameraController?.stopImageStream();
+    _poseDetector.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // 根据运动类型定义内容
     String actionName = '双手托天理三焦';
-    List<String> checkItems = ['手臂伸直', '目视手背', '腰背挺直'];
-    String suggestion = '注意保持腰背挺直，手臂伸展更充分';
+    List<String> checkItems = ['手臂伸展', '腰背挺直'];
+    String suggestion = _currentSuggestion.isNotEmpty ? _currentSuggestion : '请站到画面中央';
 
-    if (sportType == '瑜伽') {
+    if (widget.sportType == '瑜伽') {
       actionName = '猫牛式伸展';
       checkItems = ['脊柱律动', '呼吸同步', '四肢支撑'];
-      suggestion = '注意脊柱节律性延展，保持呼吸深长均匀';
-    } else if (sportType == '太极拳') {
+      suggestion = _currentSuggestion.isNotEmpty ? _currentSuggestion : '请调整姿势';
+    } else if (widget.sportType == '太极拳') {
       actionName = '左右野马分鬃';
       checkItems = ['虚实分明', '转腰带动', '气沉丹田'];
-      suggestion = '注意重心转换的平稳，转腰带动双臂拨动';
+      suggestion = _currentSuggestion.isNotEmpty ? _currentSuggestion : '请调整姿势';
     }
 
     return Scaffold(
@@ -636,7 +823,7 @@ class SportAiCorrectionScreen extends StatelessWidget {
       body: SafeArea(child: Stack(
         children: [
           // 相机背景
-          if (cameraController != null && cameraController!.value.isInitialized)
+          if (widget.cameraController != null && widget.cameraController!.value.isInitialized)
             Positioned.fill(
               child: ClipRRect(
                 child: SizedBox(
@@ -645,9 +832,9 @@ class SportAiCorrectionScreen extends StatelessWidget {
                   child: FittedBox(
                     fit: BoxFit.cover,
                     child: SizedBox(
-                      width: cameraController!.value.previewSize!.height,
-                      height: cameraController!.value.previewSize!.width,
-                      child: CameraPreview(cameraController!),
+                      width: widget.cameraController!.value.previewSize!.height,
+                      height: widget.cameraController!.value.previewSize!.width,
+                      child: CameraPreview(widget.cameraController!),
                     ),
                   ),
                 ),
@@ -692,8 +879,8 @@ class SportAiCorrectionScreen extends StatelessWidget {
                               color: Color(0xFF1E2939),
                             ),
                           ),
-                          const Text(
-                            '42%',
+                          Text(
+                            '${_poseAccuracy.toStringAsFixed(0)}%',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -728,11 +915,9 @@ class SportAiCorrectionScreen extends StatelessWidget {
       isScrollControlled: true,
       isDismissible: true,
       enableDrag: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.6,
-        builder: (context, scrollController) => Container(
+      barrierColor: Colors.black54,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => SafeArea(child: Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.only(
@@ -740,16 +925,15 @@ class SportAiCorrectionScreen extends StatelessWidget {
               topRight: Radius.circular(32),
             ),
           ),
-          child: SingleChildScrollView(
-            controller: scrollController,
-            child: _buildCorrectionPanel(
-              context,
-              actionName,
-              checkItems,
-              suggestion,
-            ),
+          child: _buildCorrectionPanel(
+            context,
+            actionName,
+            checkItems,
+            _currentSuggestion,
+            _poseAccuracy,
+            _checkResults,
           ),
-        ),
+        )),
       ),
     );
   }
@@ -825,7 +1009,9 @@ class SportAiCorrectionScreen extends StatelessWidget {
     BuildContext context,
     String actionName,
     List<String> checkItems,
-    String suggestion,
+    String currentSuggestion,
+    double poseAccuracy,
+    Map<String, bool> checkResults,
   ) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -857,9 +1043,9 @@ class SportAiCorrectionScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const Text(
-                '42%',
-                style: TextStyle(
+              Text(
+                '${poseAccuracy.toStringAsFixed(0)}%',
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF3C9566),
@@ -885,7 +1071,7 @@ class SportAiCorrectionScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    suggestion,
+                    currentSuggestion,
                     style: const TextStyle(
                       color: Color(0xFF92400E),
                       fontSize: 14,
@@ -907,9 +1093,10 @@ class SportAiCorrectionScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _checkItem(checkItems[0], true),
-          _checkItem(checkItems[1], false),
-          _checkItem(checkItems[2], false),
+          ...checkItems.asMap().entries.map((entry) {
+            final isChecked = checkResults[entry.value] ?? false;
+            return _checkItem(entry.value, isChecked);
+          }),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,

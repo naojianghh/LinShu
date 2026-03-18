@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../widgets/app_header.dart';
 import '../widgets/banner_landscape_decoration.dart';
 import 'sport_prep_screen.dart';
@@ -15,7 +16,22 @@ class _SportMainScreenState extends State<SportMainScreen> {
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFFFDFCF7),
-      child: CustomScrollView(
+      child: Stack(
+        children: [
+      Positioned.fill(
+      child: SizedBox(
+      width: double.infinity,
+        height: double.infinity,
+        child: Expanded(
+          child: Image.asset(
+            'assets/images/home_bg_1.png',
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    ),
+      CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(
           parent: ClampingScrollPhysics(),
         ),
@@ -29,19 +45,6 @@ class _SportMainScreenState extends State<SportMainScreen> {
           // 3. 页面主标题
           SliverToBoxAdapter(child: _buildPageTitle()),
 
-          // 4. 今日运动概览卡片
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverToBoxAdapter(child: _buildSportOverviewCard()),
-          ),
-
-          // 5. 传统功法分类标题
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
-            sliver: SliverToBoxAdapter(child: _buildSectionTitle('传统功法分类')),
-          ),
-
-          // 6. 功法列表
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
@@ -76,25 +79,18 @@ class _SportMainScreenState extends State<SportMainScreen> {
             ),
           ),
 
-          // 7. 练习记录模块
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+            padding: const EdgeInsets.fromLTRB(0, 32, 0, 0),
             sliver: SliverToBoxAdapter(child: _buildExerciseRecords()),
           ),
 
           // 8. 本周统计标题
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
-            sliver: SliverToBoxAdapter(child: _buildSectionTitle('本周统计')),
-          ),
-
-          // 9. 统计图表卡片
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-            sliver: SliverToBoxAdapter(child: _buildWeeklyStatsCard()),
+            padding: const EdgeInsets.fromLTRB(0,16 ,0,64),
+            sliver: SliverToBoxAdapter(child: _buildSportOverviewCard()),
           ),
         ],
-      ),
+      )]),
     );
   }
 
@@ -141,18 +137,26 @@ class _SportMainScreenState extends State<SportMainScreen> {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            const Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '智能运动纠错',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D4A3E),
-                    fontFamily: 'STKaiti',
-                  ),
+                Stack(
+                  children: [
+                    Text(
+                      '智能运动纠错',
+                      style: TextStyle(
+                        fontSize: 24.sp,
+                        fontWeight: FontWeight.w400,
+                        color: Color(0xFF2D4A3E),
+                        fontFamily: 'FZZJ-LongYTJW',
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      child: Image.asset('assets/images/sport_decoration.png',width: 152.w,),)
+                  ],
                 ),
+
                 SizedBox(height: 4),
                 Text(
                   'AI实时姿态识别与纠正',
@@ -165,11 +169,11 @@ class _SportMainScreenState extends State<SportMainScreen> {
               ],
             ),
             Positioned(
-              right: 4,
-              top: -6,
+              right: 0,
+              bottom: -24,
               child: Image.asset(
                 'assets/images/ornament_sport_round.png',
-                width: 42,
+                width: 94.w,
                 fit: BoxFit.contain,
               ),
             ),
@@ -181,27 +185,34 @@ class _SportMainScreenState extends State<SportMainScreen> {
 
   Widget _buildSportOverviewCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      height: 140.h,
+      padding: EdgeInsets.fromLTRB(24.w,36.h,24.w,16.h),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8F5ED).withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFD4EAD9), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF3C9566).withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        image: DecorationImage(image: AssetImage('assets/images/meditation_bg.png'),fit: BoxFit.fill)
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildOverviewItem('5', '本周练习'),
-          _buildOverviewDivider(),
-          _buildOverviewItem('78', '总时长(min)'),
-          _buildOverviewDivider(),
-          _buildOverviewItem('89', '平均分数'),
+          Text(
+            '本周统计',
+            style: TextStyle(
+              color: Color(0xFF2D4A3E),
+              fontFamily: 'FZZJ-LongYTJW',
+              fontSize: 16.sp,
+            ),
+          ),
+          SizedBox(height:8.h,),
+          SizedBox(
+            width: 352.w,
+              height: 52.h,
+              child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildOverviewItem('5', '本周练习'),
+              _buildOverviewItem('78', '总时长(min)'),
+              _buildOverviewItem('89', '平均分数'),
+            ],
+          ))
         ],
       ),
     );
@@ -214,8 +225,9 @@ class _SportMainScreenState extends State<SportMainScreen> {
           value,
           style: const TextStyle(
             fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w400,
             color: Color(0xFF3C9566),
+            fontFamily: 'STKaiti'
           ),
         ),
         Text(
@@ -276,21 +288,19 @@ class _SportMainScreenState extends State<SportMainScreen> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16.w,24.h,16.w,24.h),
+        height: 160.h,
         decoration: BoxDecoration(
-          color: bgColor.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: themeColor.withValues(alpha: 0.2),
-            width: 1,
-          ),
+          image: DecorationImage(image: AssetImage('assets/images/ai_function_bg.png'),fit: BoxFit.fill)
         ),
         child: Row(
           children: [
+            Image.asset(iconAsset, width: 100.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SizedBox(height: 8.h,),
                   Text(
                     title,
                     style: const TextStyle(
@@ -304,7 +314,7 @@ class _SportMainScreenState extends State<SportMainScreen> {
                   Text(
                     desc,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: Color(0xFF6B5D4F),
                       fontFamily: 'STKaiti',
                     ),
@@ -320,14 +330,14 @@ class _SportMainScreenState extends State<SportMainScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(8),
+                              color: const Color(0xFFF7EBD6),
+                              borderRadius: BorderRadius.circular(24),
                             ),
                             child: Text(
                               tag,
                               style: TextStyle(
                                 fontSize: 10,
-                                color: themeColor,
+                                color: const Color(0xFF5A5242),
                                 fontFamily: 'STKaiti',
                               ),
                             ),
@@ -338,7 +348,6 @@ class _SportMainScreenState extends State<SportMainScreen> {
                 ],
               ),
             ),
-            Image.asset(iconAsset, width: 66, height: 66),
           ],
         ),
       ),
@@ -346,50 +355,53 @@ class _SportMainScreenState extends State<SportMainScreen> {
   }
 
   Widget _buildExerciseRecords() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '练习记录',
-          style: TextStyle(
-            fontSize: 18,
-            color: Color(0xFF2D4A3E),
-            fontFamily: 'STKaiti',
-            letterSpacing: 0.5,
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 36.h,horizontal: 32.w),
+      decoration: BoxDecoration(
+        image: DecorationImage(image: AssetImage('assets/images/calendar_bg.png'),fit: BoxFit.fill)
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '练习记录',
+                style: TextStyle(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF2D4A3E),
+                  fontFamily: 'FZZJ-LongYTJW',
+                ),
+              ),
+              Image.asset('assets/images/meditation_decoration.png',width: 128.w,)
+            ],
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: 140,
-          height: 4,
-          decoration: BoxDecoration(
-            color: const Color(0xFF3C9566),
-            borderRadius: BorderRadius.circular(2),
+          const SizedBox(height: 16),
+          _buildExerciseRecordCard(
+            badgeText: '八',
+            badgeColor: const Color.fromRGBO(16, 185, 129, 0.13),
+            badgeTextColor: const Color(0xFF3C9566),
+            title: '八段锦',
+            time: '今天 08:30',
+            score: '92分',
+            level: '优秀',
+            scoreColor: const Color(0xFF3C9566),
           ),
-        ),
-        const SizedBox(height: 16),
-        _buildExerciseRecordCard(
-          badgeText: '八',
-          badgeColor: const Color.fromRGBO(16, 185, 129, 0.13),
-          badgeTextColor: const Color(0xFF3C9566),
-          title: '八段锦',
-          time: '今天 08:30',
-          score: '92分',
-          level: '优秀',
-          scoreColor: const Color(0xFF3C9566),
-        ),
-        const SizedBox(height: 12),
-        _buildExerciseRecordCard(
-          badgeText: '瑜',
-          badgeColor: const Color.fromRGBO(236, 72, 153, 0.13),
-          badgeTextColor: const Color(0xFFEC4899),
-          title: '瑜伽',
-          time: '昨天 19:00',
-          score: '88分',
-          level: '良好',
-          scoreColor: const Color(0xFFEC4899),
-        ),
-      ],
+          const SizedBox(height: 12),
+          _buildExerciseRecordCard(
+            badgeText: '瑜',
+            badgeColor: const Color.fromRGBO(236, 72, 153, 0.13),
+            badgeTextColor: const Color(0xFFEC4899),
+            title: '瑜伽',
+            time: '昨天 19:00',
+            score: '88分',
+            level: '良好',
+            scoreColor: const Color(0xFFEC4899),
+          ),
+        ],
+      ),
     );
   }
 
@@ -429,30 +441,11 @@ class _SportMainScreenState extends State<SportMainScreen> {
         children: [
           Row(
             children: [
-              Container(
+              SizedBox(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  shape: BoxShape.circle,
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x1A000000),
-                      blurRadius: 3,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
-                ),
                 child: Center(
-                  child: Text(
-                    badgeText,
-                    style: TextStyle(
-                      color: badgeTextColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'STKaiti',
-                    ),
-                  ),
+                  child: badgeText == '八' ? Image.asset('assets/images/sport_icon_baduanjin2.png') : Image.asset('assets/images/sport_icon_yoga2.png')
                 ),
               ),
               const SizedBox(width: 12),
@@ -489,7 +482,7 @@ class _SportMainScreenState extends State<SportMainScreen> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: scoreColor,
+                  color: const Color(0xFF6FB08E),
                   fontFamily: 'STKaiti',
                 ),
               ),

@@ -44,4 +44,15 @@ flutter:
     - assets/images/
     - assets/images/goddess_new/
     - assets/video/
+    - assets/fonts/
     - .env
+  fonts:
+    - family: STXinwei
+      fonts:
+        - asset: assets/fonts/STXinwei.ttf
+    - family: STKaiti
+      fonts:
+        - asset: assets/fonts/STKaiti.ttf
+    - family: FZZJ-LongYTJW
+      fonts:
+        - asset: assets/fonts/FZZJ-LongYTJW.ttf

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/app_header.dart';
 
@@ -9,22 +10,20 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double statusBarHeight = MediaQuery.of(context).padding.top;
     return Container(
       color: const Color(0xFFFDFCF7),
       child: Stack(
         children: [
-          // 顶部背景渐变
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 250,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFF8F6F0), Color(0xFFFDFCF7)],
+          Positioned.fill(
+            child: SizedBox(
+              width: double.infinity,
+              height: double.infinity,
+              child: Expanded(
+                child: Image.asset(
+                  'assets/images/home_bg_1.png',
+                  width: double.infinity,
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
@@ -39,7 +38,7 @@ class HomeScreen extends StatelessWidget {
 
               // 2. 欢迎卡片
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 sliver: SliverToBoxAdapter(child: _buildWelcomeCard(context)),
               ),
 
@@ -57,12 +56,12 @@ class HomeScreen extends StatelessWidget {
 
               // 5. 健康网格
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
                 sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
+                    crossAxisSpacing: 12.w,
+                    mainAxisSpacing: 12.h,
                     childAspectRatio: 1.9,
                   ),
                   delegate: SliverChildListDelegate([
@@ -71,28 +70,28 @@ class HomeScreen extends StatelessWidget {
                       '良好',
                       const Color(0xFFE3F2FD),
                       const Color(0xFF4A7C9E),
-                      'assets/images/icon_sleep.svg',
+                      'assets/images/health_card_sleep.png',
                     ),
                     _buildHealthCard(
                       '心率变异',
                       '正常',
                       const Color(0xFFFDEEF1),
                       const Color(0xFFC75B7A),
-                      'assets/images/icon_heart.svg',
+                      'assets/images/health_card_heart.png',
                     ),
                     _buildHealthCard(
                       '体质类型',
                       '平和质',
                       const Color(0xFFFFF9E6),
                       const Color(0xFFD4A574),
-                      'assets/images/icon_sun.svg',
+                      'assets/images/health_card_constitution.png',
                     ),
                     _buildHealthCard(
                       '饮水量',
                       '1.2L',
                       const Color(0xFFE8F5E9),
                       const Color(0xFF3C9566),
-                      'assets/images/icon_water.svg',
+                      'assets/images/health_card_water.png',
                     ),
                   ]),
                 ),
@@ -112,7 +111,7 @@ class HomeScreen extends StatelessWidget {
                     _buildFeatureCard(
                       'AI 望闻问切',
                       '面部舌象分析 · 智能体质辨识',
-                      'assets/images/home_feature_ai.png',
+                      'assets/images/home_function_ai.png',
                       const Color(0xFFF0EFEA),
                       onTap: () => onFeatureTap?.call(1),
                     ),
@@ -120,7 +119,7 @@ class HomeScreen extends StatelessWidget {
                     _buildFeatureCard(
                       '女神专区',
                       '周期性调理 · 个性化方案',
-                      'assets/images/home_feature_goddess.png',
+                      'assets/images/home_function_god.png',
                       const Color(0xFFF6F2E6),
                       onTap: () => onFeatureTap?.call(2),
                     ),
@@ -128,7 +127,7 @@ class HomeScreen extends StatelessWidget {
                     _buildFeatureCard(
                       '心灵栖息地',
                       '五音疗愈 · 冥想引导',
-                      'assets/images/home_feature_meditation.png',
+                      'assets/images/home_function_mind.png',
                       const Color(0xFFF1F0EB),
                       onTap: () => onFeatureTap?.call(3),
                     ),
@@ -136,7 +135,7 @@ class HomeScreen extends StatelessWidget {
                     _buildFeatureCard(
                       '智能运动纠错',
                       '八段锦 · 瑜伽姿态识别',
-                      'assets/images/home_feature_sport.png',
+                      'assets/images/home_function_sport.png',
                       const Color(0xFFF6F3E4),
                       onTap: () => onFeatureTap?.call(4),
                     ),
@@ -168,8 +167,8 @@ class HomeScreen extends StatelessWidget {
           style: const TextStyle(
             fontSize: 17,
             color: Color(0xFF2D4A3E),
-            fontWeight: FontWeight.bold,
-            fontFamily: 'STKaiti',
+            fontWeight: FontWeight.w400,
+            fontFamily: 'FZZJ-LongYTJW',
           ),
         ),
       ],
@@ -178,7 +177,7 @@ class HomeScreen extends StatelessWidget {
 
   Widget _buildWelcomeCard(BuildContext context) {
     return Container(
-      height: 146,
+      height: 146.h,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
@@ -204,7 +203,7 @@ class HomeScreen extends StatelessWidget {
         children: [
           // 背景装饰 SVG 可以按需添加，目前主要处理文字和人物
           Positioned(
-            left: 25,
+            left: 16,
             top: 25,
             bottom: 25,
             right: 25,
@@ -239,10 +238,10 @@ class HomeScreen extends StatelessWidget {
           ),
           // 人物图片 - 使用 home_welcome_character(1).png 半身图
           Positioned(
-            right: 0,
+            right: -12,
             bottom: 0, // 底部对齐卡片边缘
             width: 174,
-            height: 138, // 根据 Figma 节点 1:74 的尺寸调整
+            height: 138.h, // 根据 Figma 节点 1:74 的尺寸调整
             child: Image.asset(
               'assets/images/home_welcome_character_v2.png',
               fit: BoxFit.contain,
@@ -255,38 +254,27 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildSolarTermCard(BuildContext context) {
-    return Container(
-      height: 150,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        image: const DecorationImage(
-          image: AssetImage('assets/images/home_solar_term_poster.png'),
-          fit: BoxFit.cover,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
+    return Stack(
         children: [
+          Image.asset(
+              'assets/images/home_solar_term_poster_new.png'
+          ),
           Positioned(
-            top: 12,
-            right: 12,
+            top: 112.h,
+            right: 24.w,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              alignment: Alignment.center,
+              width: 64.w,
+              height: 28.h,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE8DCC8), width: 0.5),
+                border: Border.all(color: const Color(0xFFE8DCC8), width: 1.w),
               ),
-              child: const Text(
+              child: Text(
                 '2月10日',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12.sp,
                   color: Color(0xFF2D4A3E),
                   fontWeight: FontWeight.bold,
                   fontFamily: 'STKaiti',
@@ -295,8 +283,7 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildHealthCard(
@@ -304,19 +291,22 @@ class HomeScreen extends StatelessWidget {
     String value,
     Color bgColor,
     Color iconColor,
-    String svgPath,
+    String imgPath,
   ) {
     return Container(
+      width: 186.w,
+      height: 81.h,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: bgColor.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.8),
-          width: 1,
+        image: DecorationImage(
+          image: AssetImage(
+              'assets/images/health_bg.png',
+          ), // 本地图片
+          fit: BoxFit.fill,
         ),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(6),
@@ -324,10 +314,9 @@ class HomeScreen extends StatelessWidget {
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: SvgPicture.asset(
-              svgPath,
-              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-              width: 18,
+            child: Image.asset(
+              imgPath,
+              width: 42.w,
             ),
           ),
           const SizedBox(width: 10),
@@ -338,18 +327,19 @@ class HomeScreen extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF6B5D4F),
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: Color(0xFF3C9566),
                     fontFamily: 'STKaiti',
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: iconColor,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF3C9566),
                     fontFamily: 'STKaiti',
                   ),
                 ),
@@ -374,8 +364,14 @@ class HomeScreen extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          height: 100,
+          height: 140.h,
           decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage(
+                'assets/images/function_bg.png'
+              ),
+              fit: BoxFit.fill
+            ),
             color: bgColor,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
@@ -417,7 +413,7 @@ class HomeScreen extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Image.asset(imagePath, width: 85, fit: BoxFit.contain),
+                child: Image.asset(imagePath, height: 116.h, fit: BoxFit.contain),
               ),
             ],
           ),

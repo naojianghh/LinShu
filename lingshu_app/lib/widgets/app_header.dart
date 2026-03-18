@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class AppHeader extends StatelessWidget {
   final String title;
   final String subtitle;
   final String logoAsset;
   final String decorationAsset;
-  final double height;
 
   const AppHeader({
     super.key,
@@ -13,7 +13,6 @@ class AppHeader extends StatelessWidget {
     this.subtitle = '智能中医健康顾问',
     this.logoAsset = 'assets/images/home_logo.png',
     this.decorationAsset = 'assets/images/header_plum.png',
-    this.height = 100,
   });
 
   @override
@@ -21,9 +20,20 @@ class AppHeader extends StatelessWidget {
     final double statusBarHeight = MediaQuery.of(context).padding.top;
 
     return Container(
-      height: height + statusBarHeight,
+      margin: EdgeInsets.only(top: statusBarHeight),
+      height: 81.h,
       width: double.infinity,
-      padding: EdgeInsets.only(top: statusBarHeight),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFDFCF7),
+            Color(0xFFFAF8F2),
+            Color(0xFFF8F6F0),
+          ],
+        ),
+      ),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -82,15 +92,29 @@ class AppHeader extends StatelessWidget {
             ),
           ),
 
+          Positioned(
+            left: 0,
+            top: 0,
+            child: Opacity(
+              opacity: 1,
+              child: Image.asset(
+                'assets/images/app_header_decoration.png',
+                height: 24.h,
+                fit: BoxFit.contain,
+                alignment: Alignment.topRight,
+              ),
+            ),
+          ),
+
           // 2. 梅花装饰 - 右上角对齐
           Positioned(
             right: 0,
             top: 0,
             child: Opacity(
-              opacity: 0.8,
+              opacity: 1,
               child: Image.asset(
                 decorationAsset,
-                height: height,
+                height: 81.h,
                 fit: BoxFit.contain,
                 alignment: Alignment.topRight,
               ),

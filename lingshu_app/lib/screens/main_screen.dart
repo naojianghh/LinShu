@@ -32,103 +32,149 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_index],
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          height: 88.h,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8F5ED),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF8B7D6B).withValues(alpha: 0.08),
-                blurRadius: 24,
-                offset: const Offset(0, -6),
+      body: Expanded(child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          Expanded(child: Column(
+            children: [
+              Expanded(
+                child: _pages[_index],
               ),
+              SizedBox(height: 80.h)
             ],
-          ),
-          child: SafeArea(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(0, '首页', 'assets/images/icon_nav_home.svg'),
-                _buildNavItem(1, '望闻问切', 'assets/images/icon_nav_diagnosis.svg'),
-                _buildNavItem(2, '女神专区', 'assets/images/icon_nav_goddess.svg'),
-                _buildNavItem(3, '心灵栖息', 'assets/images/icon_nav_meditation.svg'),
-                _buildNavItem(4, '智能运动', 'assets/images/icon_nav_sport.svg'),
-              ],
-            ),
-          ),
+          )),
+          SafeArea(
+              child: Container(
+                height: 88.h,
+                decoration: BoxDecoration(
+                  color: Colors.transparent,//const Color(0xFFF8F5ED),
+                ),
+                child: Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    // 背景和其他图标
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                          width: 84.w,
+                          height: 84.w,
+                          decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(42.r),
+                              gradient: RadialGradient(
+                                center: Alignment.center,
+                                radius: 0.8,
+                                  colors: [
+                                    const Color(0xFFCCCCCC).withValues(alpha: 0.5),
+                                    const Color(0xFFCCCCCC).withValues(alpha: 0.4),
+                                    const Color(0xFFCCCCCC).withValues(alpha: 1),
+                                    const Color(0xFFE3E3E3).withValues(alpha: 0.5),
+                                    const Color(0xFFE3E3E3).withValues(alpha: 0.1),
+                                    const Color(0xFFE3E3E3).withValues(alpha: 0.00),
+                                  ]
+                              )
+                          )
+                      ),
+                    ),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Container(
+                          height: 3.h,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                const Color(0xFFE3E3E3).withValues(alpha: 0.1),
+                                const Color(0xFFE3E3E3).withValues(alpha: 0.2),
+                                const Color(0xFFCCCCCC).withValues(alpha: 0.3),
+                                const Color(0xFFCCCCCC).withValues(alpha: 0.4),
+                                const Color(0xFFCCCCCC).withValues(alpha: 0.5),
+                              ]
+                            )
+                          ),
+                        ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(child: _buildNavItem(0, 'assets/images/home_icon.png', 'assets/images/home_selected_icon.png'),),
+                            Expanded(child: _buildNavItem(1, 'assets/images/ask_icon.png', 'assets/images/ask_selected_icon.png'),),
+                            Expanded(child: Container(
+                              height: 56.h,
+                              decoration: BoxDecoration(color: const Color(0xFFFCFBF6)),)),
+                            Expanded(child: _buildNavItem(3, 'assets/images/mind_icon.png', 'assets/images/mind_selected_icon.png')),
+                            Expanded(child: _buildNavItem(4, 'assets/images/sport_icon.png', 'assets/images/sport_selected_icon.png')),
+                          ],
+                        )
+                      ],
+                    ),
+                    _buildCenterNavItem(2, 'assets/images/godness_icon.png', 'assets/images/godness_selected_icon.png')
+                  ],
+                ),
+              )
+          )
+        ],
+      )),
+    );
+  }
+
+  Widget _buildCenterNavItem(int index, String icon, String selectedIcon) {
+    final bool isSelected = _index == index;
+    
+    return GestureDetector(
+      onTap: () => setState(() => _index = index),
+      child: Container(
+        width: 80.w,
+        height: 80.w,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFCFBF6),
+          borderRadius: BorderRadius.circular(40.r),
+        ),
+        child: Center(
+            child: Container(
+              width: 64.w,
+              height: 64.w,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEEEEE),
+                borderRadius: BorderRadius.circular(32.r),
+              ),
+              child: Center(
+                child: Image.asset(
+                  height: 48.h,
+                  isSelected ? selectedIcon : icon,
+                ),
+              ),
+            )
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, String label, String icon) {
+  Widget _buildNavItem(int index, String icon, String selectedIcon) {
     final bool isSelected = _index == index;
-
-    return SizedBox(
-      width: 72,
-      child: InkResponse(
+    
+    // 非中间图标的处理
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCFBF6),
+      ),
+      child: GestureDetector(
         onTap: () => setState(() => _index = index),
-        radius: 36,
-        splashColor: const Color(0xFF3C9566).withValues(alpha: 0.10),
-        highlightColor: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: isSelected ? const Duration(milliseconds: 260) : const Duration(microseconds: 0),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFFE8F5ED)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF3C9566,
-                            ).withValues(alpha: 0.12),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : const [],
-                ),
-                child: SvgPicture.asset(
-                  icon,
-                  width: 22,
-                  height: 22,
-                  colorFilter: ColorFilter.mode(
-                    isSelected
-                        ? const Color(0xFF3C9566)
-                        : const Color(0xFF8B7D6B),
-                    BlendMode.srcIn,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontFamily: 'STKaiti',
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? const Color(0xFF3C9566)
-                      : const Color(0xFF8B7D6B),
-                ),
-              ),
-            ],
+        child: AnimatedContainer(
+          duration: isSelected ? const Duration(milliseconds: 260) : const Duration(microseconds: 0),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 4,
           ),
-        ),
+          child: Image.asset(
+            height: 48.h,
+            isSelected ? selectedIcon : icon,
+          ),
+        )
       ),
     );
   }
 }
+
