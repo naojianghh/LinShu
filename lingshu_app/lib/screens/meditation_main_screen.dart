@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../models/five_tone_track.dart';
 import '../services/five_tone_service.dart';
 import '../services/user_health_bridge_service.dart';
@@ -135,12 +134,10 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
       child: SizedBox(
       width: double.infinity,
         height: double.infinity,
-        child: Expanded(
-          child: Image.asset(
-            'assets/images/home_bg_1.png',
-            width: double.infinity,
-            fit: BoxFit.cover,
-          ),
+        child: Image.asset(
+          'assets/images/home_bg_1.png',
+          width: double.infinity,
+          fit: BoxFit.cover,
         ),
       ),
     ),

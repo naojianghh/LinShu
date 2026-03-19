@@ -22,12 +22,10 @@ class _SportMainScreenState extends State<SportMainScreen> {
       child: SizedBox(
       width: double.infinity,
         height: double.infinity,
-        child: Expanded(
-          child: Image.asset(
-            'assets/images/home_bg_1.png',
-            width: double.infinity,
-            fit: BoxFit.cover,
-          ),
+        child: Image.asset(
+          'assets/images/home_bg_1.png',
+          width: double.infinity,
+          fit: BoxFit.cover,
         ),
       ),
     ),
@@ -235,35 +233,6 @@ class _SportMainScreenState extends State<SportMainScreen> {
           style: const TextStyle(
             fontSize: 11,
             color: Color(0xFF6B5D4F),
-            fontFamily: 'STKaiti',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOverviewDivider() {
-    return Container(width: 1, height: 30, color: const Color(0xFFD4EAD9));
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 16,
-          decoration: BoxDecoration(
-            color: const Color(0xFF3C9566),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 17,
-            color: Color(0xFF2D4A3E),
-            fontWeight: FontWeight.bold,
             fontFamily: 'STKaiti',
           ),
         ),
@@ -499,74 +468,6 @@ class _SportMainScreenState extends State<SportMainScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildWeeklyStatsCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3E8FF).withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFDDD6FE), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '平均准确度变化',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF5B21B6),
-              fontFamily: 'STKaiti',
-            ),
-          ),
-          const SizedBox(height: 20),
-          // 模拟统计图表
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _buildBar(0.4, '周一'),
-              _buildBar(0.6, '周二'),
-              _buildBar(0.5, '周三'),
-              _buildBar(0.8, '周四'),
-              _buildBar(0.9, '周五'),
-              _buildBar(0.7, '周六'),
-              _buildBar(0.85, '周日'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBar(double heightFactor, String day) {
-    return Column(
-      children: [
-        Container(
-          width: 12,
-          height: 80 * heightFactor,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [Color(0xFF7C3AED), Color(0xFFA78BFA)],
-            ),
-            borderRadius: BorderRadius.circular(6),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          day,
-          style: const TextStyle(
-            fontSize: 10,
-            color: Color(0xFF6B5D4F),
-            fontFamily: 'STKaiti',
-          ),
-        ),
-      ],
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/app_header.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -19,12 +18,10 @@ class HomeScreen extends StatelessWidget {
             child: SizedBox(
               width: double.infinity,
               height: double.infinity,
-              child: Expanded(
-                child: Image.asset(
-                  'assets/images/home_bg_1.png',
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+              child: Image.asset(
+                'assets/images/home_bg_1.png',
+                width: double.infinity,
+                fit: BoxFit.cover,
               ),
             ),
           ),

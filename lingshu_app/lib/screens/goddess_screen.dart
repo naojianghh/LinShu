@@ -84,12 +84,10 @@ class _GoddessScreenState extends State<GoddessScreen> {
       child: SizedBox(
       width: double.infinity,
         height: double.infinity,
-        child: Expanded(
-          child: Image.asset(
-            'assets/images/home_bg_1.png',
-            width: double.infinity,
-            fit: BoxFit.cover,
-          ),
+        child: Image.asset(
+          'assets/images/home_bg_1.png',
+          width: double.infinity,
+          fit: BoxFit.cover,
         ),
       ),
     ),

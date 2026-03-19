@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'home_screen.dart';
 import 'ai_diagnosis_screen.dart';
 import 'goddess_screen.dart';
@@ -32,17 +31,17 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Expanded(child: Stack(
+      body:  Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          Expanded(child: Column(
+          Column(
             children: [
               Expanded(
                 child: _pages[_index],
               ),
               SizedBox(height: 80.h)
             ],
-          )),
+          ),
           SafeArea(
               child: Container(
                 height: 88.h,
@@ -61,8 +60,8 @@ class _MainScreenState extends State<MainScreen> {
                           decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(42.r),
                               gradient: RadialGradient(
-                                center: Alignment.center,
-                                radius: 0.8,
+                                  center: Alignment.center,
+                                  radius: 0.8,
                                   colors: [
                                     const Color(0xFFCCCCCC).withValues(alpha: 0.5),
                                     const Color(0xFFCCCCCC).withValues(alpha: 0.4),
@@ -82,17 +81,17 @@ class _MainScreenState extends State<MainScreen> {
                           height: 3.h,
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                const Color(0xFFE3E3E3).withValues(alpha: 0.1),
-                                const Color(0xFFE3E3E3).withValues(alpha: 0.2),
-                                const Color(0xFFCCCCCC).withValues(alpha: 0.3),
-                                const Color(0xFFCCCCCC).withValues(alpha: 0.4),
-                                const Color(0xFFCCCCCC).withValues(alpha: 0.5),
-                              ]
-                            )
+                              gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    const Color(0xFFE3E3E3).withValues(alpha: 0.1),
+                                    const Color(0xFFE3E3E3).withValues(alpha: 0.2),
+                                    const Color(0xFFCCCCCC).withValues(alpha: 0.3),
+                                    const Color(0xFFCCCCCC).withValues(alpha: 0.4),
+                                    const Color(0xFFCCCCCC).withValues(alpha: 0.5),
+                                  ]
+                              )
                           ),
                         ),
                         Row(
@@ -116,7 +115,7 @@ class _MainScreenState extends State<MainScreen> {
               )
           )
         ],
-      )),
+      ),
     );
   }
 
