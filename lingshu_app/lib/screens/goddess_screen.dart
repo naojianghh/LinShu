@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:lingshu_app/utils/log_util.dart';
 
 import '../services/user_health_bridge_service.dart';
 import '../widgets/app_header.dart';
@@ -59,18 +60,21 @@ class _GoddessScreenState extends State<GoddessScreen> {
   @override
   void initState() {
     super.initState();
+    Log.d('开始加载_loadInsights');
     _loadInsights();
   }
 
   Future<void> _loadInsights() async {
     try {
       final data = await _bridgeService.getUnifiedInsights();
+      Log.d('_loadInsights: ${data}');
       if (!mounted) return;
       setState(() {
         _insights = data;
       });
-    } catch (_) {
+    } catch (e) {
       // 使用静态兜底数据
+      Log.d('_loadInsights: ${e}');
     }
   }
 

@@ -256,6 +256,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             ),
             const SizedBox(width: 12),
             Container(
+              constraints: BoxConstraints(maxWidth: 150.w),
               padding: const EdgeInsets.symmetric(
                 horizontal: 12,
                 vertical: 6,
@@ -429,7 +430,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   }
 
   Widget _buildBottomActions(BuildContext context) {
-    return Stack(
+    return Column(
       children: [
         if (widget.report.riskWarning.isNotEmpty)
           Container(
@@ -462,57 +463,54 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               ],
             ),
           ),
-        Padding(
-          padding: EdgeInsets.only(top: 48.h),
-          child: Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () =>
-                      Navigator.of(context).popUntil((route) => route.isFirst),
-                  child: Container(
-                    height: 100.h,
-                    decoration: BoxDecoration(
-                        image: DecorationImage(image: AssetImage('assets/images/buy_button_bg.png'),fit: BoxFit.fitHeight)
-                    ),
-                    child: Center(
-                      child: const Text(
-                        '完成',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'STKaiti',
-                        ),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () =>
+                    Navigator.of(context).popUntil((route) => route.isFirst),
+                child: Container(
+                  height: 100.h,
+                  decoration: BoxDecoration(
+                      image: DecorationImage(image: AssetImage('assets/images/buy_button_bg.png'),fit: BoxFit.fitHeight)
+                  ),
+                  child: Center(
+                    child: const Text(
+                      '完成',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'STKaiti',
                       ),
                     ),
                   ),
                 ),
               ),
-              SizedBox(width: 8.w,),
-              Expanded(
-                child: GestureDetector(
-                  onTap: _copySummary,
-                  child: Container(
-                    height: 100.h,
-                    decoration: BoxDecoration(
-                        image: DecorationImage(image: AssetImage('assets/images/buy_button_bg.png'),fit: BoxFit.fitHeight)
-                    ),
-                    child: Center(
-                      child: const Text(
-                        '保存',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'STKaiti',
-                        ),
+            ),
+            SizedBox(width: 8.w,),
+            Expanded(
+              child: GestureDetector(
+                onTap: _copySummary,
+                child: Container(
+                  height: 100.h,
+                  decoration: BoxDecoration(
+                      image: DecorationImage(image: AssetImage('assets/images/buy_button_bg.png'),fit: BoxFit.fitHeight)
+                  ),
+                  child: Center(
+                    child: const Text(
+                      '保存',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'STKaiti',
                       ),
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+          ],
+        )
       ],
     );
   }
