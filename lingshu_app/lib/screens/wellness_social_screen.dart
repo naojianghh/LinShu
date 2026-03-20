@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class WellnessSocialScreen extends StatefulWidget {
   const WellnessSocialScreen({super.key});
@@ -19,17 +20,16 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF244438)),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF244438)),
           onPressed: () => Navigator.pop(context),
         ),
-        titleSpacing: 0,
+        centerTitle: false,
         title: const Text(
           '养生社交',
           style: TextStyle(
             color: Color(0xFF244438),
             fontFamily: 'STKaiti',
             fontWeight: FontWeight.bold,
-            fontSize: 24,
           ),
         ),
       ),
@@ -40,7 +40,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
           const SizedBox(height: 14),
           if (tab == 0) ...[
             _tipCard(
-              'AI智能匹配',
+              '💡 AI智能匹配',
               '系统识别到与您相似体质（宫寒）的用户正在组团购买，智能推荐拼单机会，降低购买成本！',
               const Color(0xFFF1FAF1),
               const Color(0xFFA9DCB3),
@@ -56,7 +56,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
               0.6,
               '3/5人',
               '还差2人',
-              'assets/images/goddess_new/gift_1.jpg',
+              'assets/images/gift_img.png',
             ),
             const SizedBox(height: 12),
             _groupCard(
@@ -69,11 +69,11 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
               0.8,
               '4/5人',
               '还差1人',
-              'assets/images/goddess_new/gift_2.jpg',
+              'assets/images/gift_img.png',
             ),
           ] else if (tab == 1) ...[
             _tipCard(
-              '闺蜜监督',
+              '💕 闺蜜监督',
               '和闺蜜互相监督每日饮食和记录，完成7日连续打卡可获得专属体质徽章。',
               const Color(0xFFF1F8FF),
               const Color(0xFFA7CBEF),
@@ -84,7 +84,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
             _simpleCard('连续打卡', '你已连续打卡 5 天，再坚持 2 天可领取奖励'),
           ] else ...[
             _tipCard(
-              '暖心礼物',
+              '🎁 暖心礼物',
               '一键发送养生礼盒给好友，附带AI生成的定制暖心贺卡！ 由于问生态提供配送服务。',
               const Color(0xFFFFF8E9),
               const Color(0xFFF1DCA6),
@@ -98,7 +98,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
                   child: _giftChoice(
                     '气血双补礼盒',
                     '168',
-                    'assets/images/goddess_new/drink_4.jpg',
+                    'assets/images/gift_img.png',
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -106,7 +106,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
                   child: _giftChoice(
                     '清热降火礼盒',
                     '148',
-                    'assets/images/goddess_new/drink_2.jpg',
+                    'assets/images/gift_img.png',
                   ),
                 ),
               ],
@@ -136,17 +136,15 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
               child: Container(
                 height: 40,
                 decoration: BoxDecoration(
-                  color: selected ? const Color(0xFF3C9566) : Colors.white,
+                  color: selected ? const Color(0xFFF0DCA9) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE8DCC8)),
+                  border: Border.all(color: const Color(0xFFF0DCA9)),
                   boxShadow: selected
                       ? [
                           BoxShadow(
-                            color: const Color(
-                              0xFF3C9566,
-                            ).withValues(alpha: 0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                            color: Colors.grey,
+                            blurRadius: 2,
+                            offset: const Offset(0, 2),
                           ),
                         ]
                       : null,
@@ -354,7 +352,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
                     minHeight: 10,
                     backgroundColor: const Color(0xFFF0EFEB),
                     valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF44AF6E),
+                      Color(0xFFF0DCA9),
                     ),
                   ),
                 ),
@@ -369,28 +367,17 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            height: 52,
+            height: 100,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF3EA76E), Color(0xFF5AC273)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF3EA76E).withValues(alpha: 0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              image: DecorationImage(image: AssetImage('assets/images/buy_button_bg.png'),fit: BoxFit.fill)
             ),
             child: Center(
               child: Text(
                 '立即参团（$remain）',
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: Color(0xFF6B5D4F),
                   fontFamily: 'STKaiti',
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -454,7 +441,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(14),
                 child: Image.asset(
-                  'assets/images/goddess_new/gift_1.jpg',
+                  'assets/images/gift_img.png',
                   width: 120,
                   height: 120,
                   fit: BoxFit.cover,
@@ -540,21 +527,17 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            height: 54,
+            height: 100,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFF8B5A), Color(0xFFF54888)],
-              ),
-              borderRadius: BorderRadius.circular(16),
+              image: DecorationImage(image: AssetImage('assets/images/buy_button_bg.png'),fit: BoxFit.fill)
             ),
             child: const Center(
               child: Text(
                 '赠送给好友',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: Color(0xFF6B5D4F),
                   fontFamily: 'STKaiti',
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -584,7 +567,7 @@ class _WellnessSocialScreenState extends State<WellnessSocialScreen> {
             ),
             child: Image.asset(
               image,
-              height: 180,
+              height: 100.h,
               width: double.infinity,
               fit: BoxFit.cover,
             ),

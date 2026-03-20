@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:lingshu_app/utils/log_util.dart';
 
 import '../models/diagnosis_report.dart';
 
@@ -54,7 +55,7 @@ class QwenService {
           'response_format': {'type': 'json_object'},
         },
       );
-
+      Log.d('AI 请求响应：$response');
       final content =
           (response.data['choices'] as List).first['message']['content'];
       final Map<String, dynamic> data = jsonDecode(content as String);
@@ -122,11 +123,12 @@ class QwenService {
           'max_tokens': 380,
         },
       );
-
+      Log.d('AI 请求响应：$response');
       final content =
           (response.data['choices'] as List).first['message']['content'];
       return (content as String).trim();
     } catch (e) {
+      Log.d('问诊对话失败：$e');
       throw Exception('问诊对话失败: $e');
     }
   }

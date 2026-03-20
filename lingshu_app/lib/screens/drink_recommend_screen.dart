@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../services/user_health_bridge_service.dart';
 
@@ -13,7 +14,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
   final UserHealthBridgeService _bridgeService =
       UserHealthBridgeService.instance;
 
-  late List<(String, String, String, String)> drinks;
+  late List<(String, String, String, String, String)> drinks;
   UnifiedHealthInsights? _insights;
 
   @override
@@ -24,11 +25,12 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
         '姜枣暖宫茶',
         '温中散寒，暖宫调经，缓解痛经',
         '18',
-        'assets/images/goddess_new/drink_1.png',
+        'assets/images/goddess_tea1.png',
+      'assets/images/goddess_new/drink_1.png',
       ),
-      ('百合银耳羹', '清润养阴，舒缓燥热不适', '8', 'assets/images/goddess_new/drink_2.png'),
-      ('玫瑰花茶', '舒肝理气，帮助情绪平稳', '8', 'assets/images/goddess_new/drink_3.png'),
-      ('桂圆红枣茶', '益气补血，温和调理体质', '5', 'assets/images/goddess_new/drink_4.png'),
+      ('百合银耳羹', '清润养阴，舒缓燥热不适', '8', 'assets/images/goddess_tea2.png','assets/images/goddess_new/drink_2.png',),
+      ('玫瑰花茶', '舒肝理气，帮助情绪平稳', '8', 'assets/images/goddess_tea3.png','assets/images/goddess_new/drink_3.png',),
+      ('桂圆红枣茶', '益气补血，温和调理体质', '5', 'assets/images/goddess_tea4.png','assets/images/goddess_new/drink_4.png',),
     ];
     _loadData();
   }
@@ -42,6 +44,12 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
         _insights = insights;
         if (generated.isNotEmpty) {
           final imagePool = const [
+            'assets/images/goddess_tea1.png',
+            'assets/images/goddess_tea2.png',
+            'assets/images/goddess_tea3.png',
+            'assets/images/goddess_tea4.png',
+          ];
+          final detailImagePool = const [
             'assets/images/goddess_new/drink_1.png',
             'assets/images/goddess_new/drink_2.png',
             'assets/images/goddess_new/drink_3.png',
@@ -54,6 +62,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
               item['description'] ?? '结合体质与周期推荐',
               item['price'] ?? '12',
               imagePool[index % imagePool.length],
+              detailImagePool[index % detailImagePool.length],
             );
           });
         }
@@ -74,6 +83,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
           icon: const Icon(Icons.arrow_back, color: Color(0xFF244438)),
           onPressed: () => Navigator.pop(context),
         ),
+        centerTitle: false,
         title: const Text(
           '智能饮品推荐',
           style: TextStyle(
@@ -88,14 +98,20 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
         children: [
           _buildAiCard(),
           const SizedBox(height: 18),
-          const Text(
-            '精准推荐',
-            style: TextStyle(
-              fontSize: 34 / 2,
-              fontFamily: 'STKaiti',
-              color: Color(0xFF244438),
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Image.asset('assets/images/tea_recommend_icon.png',height: 28,),
+              SizedBox(width: 4,),
+              const Text(
+                '精准推荐',
+                style: TextStyle(
+                  fontSize: 34 / 2,
+                  fontFamily: 'STKaiti',
+                  color: Color(0xFF244438),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           _featuredCard(drinks[0]),
@@ -140,14 +156,20 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '✧ AI 智能分析',
-            style: TextStyle(
-              fontSize: 34 / 2,
-              color: Color(0xFF244438),
-              fontFamily: 'STKaiti',
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Image.asset('assets/images/ai_analyze_icon.png',width: 20,),
+              SizedBox(width: 8.w,),
+              const Text(
+                'AI 智能分析',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF244438),
+                  fontFamily: 'STKaiti',
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+            ],
           ),
           const SizedBox(height: 12),
           const Text(
@@ -159,11 +181,11 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _Tag(_insights?.latestReport?.constitution ?? '宫寒', true),
-              _Tag(_insights?.latestReport?.pattern ?? '阴虚火旺', false),
-              const _Tag('气血两虚', false),
-              const _Tag('气郁体质', false),
-              const _Tag('湿热体质', false),
+              _tag(_insights?.latestReport?.constitution ?? '宫寒', true),
+              _tag(_insights?.latestReport?.pattern ?? '阴虚火旺', false),
+              _tag('气血两虚', false),
+              _tag('气郁体质', false),
+              _tag('湿热体质', false),
             ],
           ),
           const SizedBox(height: 12),
@@ -173,16 +195,12 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
           ),
           const SizedBox(height: 8),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Expanded(
-                child: _Tag('经期', _insights?.cyclePhase == '经期', pink: true),
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: _Tag('卵泡期', _insights?.cyclePhase == '卵泡期')),
-              const SizedBox(width: 8),
-              Expanded(child: _Tag('排卵期', _insights?.cyclePhase == '排卵期')),
-              const SizedBox(width: 8),
-              Expanded(child: _Tag('黄体期', _insights?.cyclePhase == '黄体期')),
+              _tag('经期', _insights?.cyclePhase == '经期', pink: true),
+              _tag('卵泡期', _insights?.cyclePhase == '卵泡期'),
+              _tag('排卵期', _insights?.cyclePhase == '排卵期'),
+              _tag('黄体期', _insights?.cyclePhase == '黄体期'),
             ],
           ),
           const SizedBox(height: 12),
@@ -193,20 +211,37 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Text(
-              'ⓘ 您处于${_insights?.cyclePhase ?? '经期'}，体质为${_insights?.latestReport?.constitution ?? '宫寒'}，AI 为您精准匹配最适合的养生饮品。',
-              style: const TextStyle(
-                color: Color(0xFF5D6D67),
-                fontFamily: 'STKaiti',
-              ),
-            ),
+            child: Text.rich(
+              TextSpan(
+                text: 'ⓘ 您处于',
+                style: TextStyle(fontSize: 10, color: Color(0xFF5D6D67)),
+                children: [
+                  TextSpan(
+                    text: _insights?.cyclePhase ?? '经期',
+                    style: TextStyle(fontSize: 10, color: Color(0xFFF54888)),
+                  ),
+                  TextSpan(
+                    text: '，体质为',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF5D6D67)),
+                  ),
+                  TextSpan(
+                    text: _insights?.latestReport?.constitution ?? '宫寒',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF2E9B68)),
+                  ),
+                  TextSpan(
+                    text: '，AI 为您精准匹配最适合的养生饮品。',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF5D6D67)),
+                  ),
+                  ],
+                ),
+              )
           ),
         ],
       ),
     );
   }
 
-  Widget _featuredCard((String, String, String, String) drink) {
+  Widget _featuredCard((String, String, String, String, String) drink) {
     return InkWell(
       onTap: () => _showDetail(drink),
       borderRadius: BorderRadius.circular(20),
@@ -279,7 +314,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
     );
   }
 
-  Widget _drinkItem((String, String, String, String) drink) {
+  Widget _drinkItem((String, String, String, String, String) drink) {
     return InkWell(
       onTap: () => _showDetail(drink),
       borderRadius: BorderRadius.circular(18),
@@ -342,191 +377,254 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
     );
   }
 
-  void _showDetail((String, String, String, String) drink) {
-    showModalBottomSheet(
+  void _showDetail((String, String, String, String, String) drink) {
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.86,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      builder: (context) {
+        return Dialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: 16.w),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
           ),
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              Stack(
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(28),
+            ),
+            child:SizedBox(
+              height: MediaQuery.of(context).size.height * 0.85,
+              child: ListView(
+                padding: EdgeInsets.zero,
                 children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(28),
-                    ),
-                    child: Image.asset(
-                      drink.$4,
-                      height: 240,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    right: 12,
-                    top: 12,
-                    child: CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close),
+                  Stack(
+                    children: [
+                      Image.asset(
+                        drink.$5,
+                        width: double.infinity,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      drink.$1,
-                      style: const TextStyle(
-                        fontSize: 40 / 2,
-                        color: Color(0xFF244438),
-                        fontFamily: 'STKaiti',
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      drink.$2,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF6F6256),
-                        fontFamily: 'STKaiti',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      '主要功效',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Color(0xFF244438),
-                        fontFamily: 'STKaiti',
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _SmallTag('温暖子宫', Color(0xFFE7F7EB), Color(0xFF4A9D68)),
-                        _SmallTag('缓解痛经', Color(0xFFE7F7EB), Color(0xFF4A9D68)),
-                        _SmallTag('改善宫寒', Color(0xFFE7F7EB), Color(0xFF4A9D68)),
-                        _SmallTag('补气养血', Color(0xFFE7F7EB), Color(0xFF4A9D68)),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      '价格',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF6F6256),
-                        fontFamily: 'STKaiti',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '¥${drink.$3}',
-                      style: const TextStyle(
-                        fontSize: 48 / 2,
-                        color: Color(0xFFF54888),
-                        fontFamily: 'STKaiti',
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFF8B5A), Color(0xFFF54888)],
+                      Positioned(
+                        right: 12,
+                        top: 12,
+                        child: CircleAvatar(
+                          backgroundColor: Colors.white,
+                          child: IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close,color: Color(0xFF0A0A0A),),
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Center(
-                        child: Text(
-                          '🛒 千问一键下单',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white,
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          drink.$1,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            color: Color(0xFF244438),
                             fontFamily: 'STKaiti',
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Center(
-                      child: Text(
-                        '由于问生态提供物流配送服务',
-                        style: TextStyle(
-                          color: Color(0xFF7B6E62),
-                          fontFamily: 'STKaiti',
+                        const SizedBox(height: 8),
+                        Text(
+                          drink.$2,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6F6256),
+                            fontFamily: 'STKaiti',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '主要功效',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF8B7D6B),
+                            fontFamily: 'STKaiti',
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Wrap(
+                          spacing: 4,
+                          runSpacing: 8,
+                          children: [
+                            _SmallTag('温暖子宫', Color(0xFFE7F7EB), Color(0xFF4A9D68)),
+                            _SmallTag('缓解痛经', Color(0xFFE7F7EB), Color(0xFF4A9D68)),
+                            _SmallTag('改善宫寒', Color(0xFFE7F7EB), Color(0xFF4A9D68)),
+                            _SmallTag('补气养血', Color(0xFFE7F7EB), Color(0xFF4A9D68)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '配方成分',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF8B7D6B),
+                            fontFamily: 'STKaiti',
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Wrap(
+                          spacing: 4,
+                          runSpacing: 8,
+                          children: [
+                            _SmallTag('生姜', Color(0xFFFFF9E6),Color(0xFF8B7D6B), type: 2,),
+                            _SmallTag('红枣', Color(0xFFFFF9E6),Color(0xFF8B7D6B), type: 2),
+                            _SmallTag('红糖', Color(0xFFFFF9E6),Color(0xFF8B7D6B), type: 2),
+                            _SmallTag('桂圆', Color(0xFFFFF9E6),Color(0xFF8B7D6B), type: 2),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '适合体质',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF8B7D6B),
+                            fontFamily: 'STKaiti',
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Wrap(
+                          spacing: 4,
+                          runSpacing: 8,
+                          children: [
+                            _SmallTag('生姜', Color(0xFFFFEEF3),Color(0xFFFF4D8C)),
+                            _SmallTag('红枣', Color(0xFFFFEEF3),Color(0xFFFF4D8C)),
+                            _SmallTag('红糖', Color(0xFFFFEEF3),Color(0xFFFF4D8C)),
+                            _SmallTag('桂圆', Color(0xFFFFEEF3),Color(0xFFFF4D8C)),
+                          ],
+                        ),
+                        const SizedBox(height: 16,),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(16),
+                          border:BoxBorder.all(color: const Color(0xFFFFE0B2)),
+                        ),
+                        child: Text(
+                          '⚠️ 不适宜：阴虚火旺',
+                          style: TextStyle(color: const Color(0xFF8B7D6B), fontFamily: 'STKaiti', fontSize: 11),
                         ),
                       ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          height: 80.h,
+                          width: double.infinity,
+                          child: Row(
+                            children: [
+                              Column(
+                                children: [
+                                  SizedBox(height: 12.h,),
+                                  const Text(
+                                    '价格',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF6F6256),
+                                      fontFamily: 'STKaiti',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '¥${drink.$3}',
+                                    style: const TextStyle(
+                                      fontSize: 48 / 2,
+                                      color: Color(0xFFF54888),
+                                      fontFamily: 'STKaiti',
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                ],
+                              ),
+                              const Expanded(child: SizedBox()),
+                              Container(
+                                width: 196.w,
+                                decoration: BoxDecoration(
+                                    image: DecorationImage(image: AssetImage('assets/images/buy_button_bg.png'), fit: BoxFit.fill)
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    '一键下单',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Color(0xFF6B5D4F),
+                                      fontFamily: 'STKaiti',
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Center(
+                          child: Text(
+                            '由千问生态提供物流配送服务',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF7B6E62),
+                              fontFamily: 'STKaiti',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
     );
   }
-}
 
-class _Tag extends StatelessWidget {
-  final String text;
-  final bool selected;
-  final bool pink;
-
-  const _Tag(this.text, this.selected, {this.pink = false});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _tag (String text ,bool selected,{bool pink = false}) {
     final activeColor = pink
         ? const Color(0xFFF54888)
         : const Color(0xFF2E9B68);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: selected ? activeColor : Colors.white,
+        gradient: selected ? LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF6FB08E),
+            const Color(0xFF83C6A2)
+          ]
+        ) : null,
+        color: pink ? activeColor : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8DCC8)),
+        border: selected ? Border.all(color: Colors.transparent) : Border.all(color: const Color(0xFFE8DCC8)),
       ),
-      child: Center(
-        child: Text(
-          text,
-          style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF6F6256),
-            fontFamily: 'STKaiti',
-          ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: selected || pink ? Colors.white : const Color(0xFF6F6256),
+          fontFamily: 'STKaiti',
         ),
       ),
     );
   }
 }
 
+
 class _SmallTag extends StatelessWidget {
   final String text;
   final Color bg;
   final Color textColor;
+  final int type;
 
-  const _SmallTag(this.text, this.bg, this.textColor);
+  const _SmallTag(this.text, this.bg, this.textColor, {this.type = 1});
 
   @override
   Widget build(BuildContext context) {
@@ -535,10 +633,11 @@ class _SmallTag extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(10),
+        border: type == 2 ? BoxBorder.all(color: const Color(0xFFFFE0B2)) : null,
       ),
       child: Text(
         text,
-        style: TextStyle(color: textColor, fontFamily: 'STKaiti'),
+        style: TextStyle(color: textColor, fontFamily: 'STKaiti', fontSize: 11),
       ),
     );
   }

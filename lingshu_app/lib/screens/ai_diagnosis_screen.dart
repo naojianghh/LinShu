@@ -300,8 +300,8 @@ class _AiDiagnosisScreenState extends State<AiDiagnosisScreen> {
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: Center(child: CircularProgressIndicator()),
                     ),
-                  )
-                else if (_historyReports.isEmpty)
+                  ),
+                _historyReports.isEmpty ?
                   const SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -315,9 +315,9 @@ class _AiDiagnosisScreenState extends State<AiDiagnosisScreen> {
                       ),
                     ),
                   )
-                else
+                :
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 0),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final report = _historyReports[index];
@@ -488,34 +488,25 @@ class _AiDiagnosisScreenState extends State<AiDiagnosisScreen> {
     required String leadingSvg,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(32,32,32,20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+          image: DecorationImage(image: AssetImage('assets/images/meditation_bg.png'),fit: BoxFit.fill)
       ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 44.w,
+            height: 44.w,
             decoration: BoxDecoration(
-              color: tagBg,
+              color: const Color(0xFFF0DCA9),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Center(
               child: SvgPicture.asset(
                 leadingSvg,
-                width: 20,
-                height: 20,
-                colorFilter: ColorFilter.mode(tagFg, BlendMode.srcIn),
+                width: 24.w,
+                height: 24.w,
+                colorFilter: ColorFilter.mode(const Color(0xFF715735), BlendMode.srcIn),
               ),
             ),
           ),
@@ -548,7 +539,7 @@ class _AiDiagnosisScreenState extends State<AiDiagnosisScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: tagBg,
+              color: const Color(0xFFF0DCA9),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -557,7 +548,7 @@ class _AiDiagnosisScreenState extends State<AiDiagnosisScreen> {
                 fontSize: 12,
                 fontFamily: 'STKaiti',
                 fontWeight: FontWeight.bold,
-                color: tagFg,
+                color: const Color(0xFF715735),
               ),
             ),
           ),

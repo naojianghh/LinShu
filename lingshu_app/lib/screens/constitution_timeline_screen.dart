@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:lingshu_app/utils/log_util.dart';
 
 class ConstitutionTimelineScreen extends StatelessWidget {
   const ConstitutionTimelineScreen({super.key});
@@ -14,17 +16,16 @@ class ConstitutionTimelineScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF244438)),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF244438)),
           onPressed: () => Navigator.pop(context),
         ),
-        titleSpacing: 0,
+        centerTitle: false,
         title: const Text(
           '体质演化时间轴',
           style: TextStyle(
             color: Color(0xFF244438),
             fontFamily: 'STKaiti',
             fontWeight: FontWeight.bold,
-            fontSize: 24,
           ),
         ),
       ),
@@ -32,12 +33,15 @@ class ConstitutionTimelineScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           children: [
-            Row(
-              children: [
-                Expanded(child: _switchBtn('月度报告', true)),
-                const SizedBox(width: 10),
-                Expanded(child: _switchBtn('季度报告', false)),
-              ],
+            SizedBox(
+              height: 36.h,
+              child: Row(
+                children: [
+                  Expanded(child: _switchBtn('月度报告', true)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _switchBtn('季度报告', false)),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
             _radarCard(),
@@ -57,15 +61,15 @@ class ConstitutionTimelineScreen extends StatelessWidget {
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFF3C9566) : Colors.white,
+        color: selected ? const Color(0xFFF0DCA9) : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE8DCC8)),
+        border: Border.all(color: selected ? const Color(0xFFF0DCA9) : const Color(0xFFE8DCC8)),
         boxShadow: selected
             ? [
                 BoxShadow(
-                  color: const Color(0xFF3C9566).withValues(alpha: 0.2),
-                  blurRadius: 8,
+                  blurRadius: 2,
                   offset: const Offset(0, 2),
+                  color: Colors.grey
                 ),
               ]
             : null,
@@ -104,8 +108,9 @@ class ConstitutionTimelineScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          const SizedBox(
-            height: 380,
+          Container(
+            padding: EdgeInsets.all(8.r),
+            height: 280,
             child: ConstitutionRadarChart(
               labels: ['寒气', '湿气', '气血', '气郁', '瘀滞'],
               values: [0.38, 0.22, 0.62, 0.27, 0.35],
@@ -114,11 +119,11 @@ class ConstitutionTimelineScreen extends StatelessWidget {
           const SizedBox(height: 8),
           const Row(
             children: [
-              Expanded(child: _MetricItem('寒气值', '35↘20')),
+              Expanded(child: _MetricItem('寒气值', '35',false,'20')),
               SizedBox(width: 10),
-              Expanded(child: _MetricItem('湿气值', '45↘5')),
+              Expanded(child: _MetricItem('湿气值', '45',false,'5')),
               SizedBox(width: 10),
-              Expanded(child: _MetricItem('气血值', '75↗20')),
+              Expanded(child: _MetricItem('气血值', '75',true, '20')),
             ],
           ),
         ],
@@ -137,25 +142,31 @@ class ConstitutionTimelineScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '养生成就',
-            style: TextStyle(
-              fontSize: 20,
-              color: Color(0xFF244438),
-              fontFamily: 'STKaiti',
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Image.asset('assets/images/award_icon.png', width: 20.w,),
+              SizedBox(width: 8.w,),
+              const Text(
+                '养生成就',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Color(0xFF244438),
+                  fontFamily: 'STKaiti',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           _achieveItem(
-            '宫寒指数下降 20%',
+            '🎯 宫寒指数下降 20%',
             '本月你坚持饮用了15次“姜枣茶”，数据显示你的宫寒指数从55降至35，痛经评分从8分降至3分。继续保持！',
             const Color(0xFF3C9566),
             '-20%',
           ),
           const SizedBox(height: 10),
           _achieveItem(
-            '气血充盈度提升 20%',
+            '💪 气血充盈度提升 20%',
             '坚持记录周期并按建议饮食，气血水平从55提升至75，整体精神状态明显改善。',
             const Color(0xFFF09B3F),
             '+20%',
@@ -183,7 +194,7 @@ class ConstitutionTimelineScreen extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 14,
               color: Color(0xFF244438),
               fontFamily: 'STKaiti',
               fontWeight: FontWeight.bold,
@@ -193,7 +204,7 @@ class ConstitutionTimelineScreen extends StatelessWidget {
           Text(
             desc,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 12,
               color: Color(0xFF6F6256),
               fontFamily: 'STKaiti',
               height: 1.4,
@@ -243,7 +254,7 @@ class ConstitutionTimelineScreen extends StatelessWidget {
           const Text(
             '月度趋势',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               color: Color(0xFF244438),
               fontFamily: 'STKaiti',
               fontWeight: FontWeight.bold,
@@ -288,20 +299,20 @@ class ConstitutionTimelineScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'AI 健康预测',
+            '🔮 AI 健康预测',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               color: Color(0xFF244438),
               fontFamily: 'STKaiti',
               fontWeight: FontWeight.bold,
             ),
           ),
           SizedBox(height: 12),
-          _PredictLine('按照当前趋势，预计下个月你的整体气血水平将达到“优良”等级。'),
+          _PredictLine('📈 按照当前趋势，预计下个月你的整体气血水平将达到 "优良" 等级。'),
           SizedBox(height: 10),
-          _PredictLine('建议继续保持当前的饮食和作息习惯，下次经期可能不会出现明显痛经症状。'),
+          _PredictLine('💡 建议继续保持当前的饮食和作息习惯，下次经期可能不会出现明显痛经症状。'),
           SizedBox(height: 10),
-          _PredictLine('预计 4月中旬进入最佳受孕期，身体状态最佳。'),
+          _PredictLine('🌸 预计 4月中旬进入最佳受孕期，身体状态最佳。'),
         ],
       ),
     );
@@ -323,43 +334,48 @@ class ConstitutionRadarChart extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = math.min(constraints.maxWidth, constraints.maxHeight);
-        return Stack(
-          children: [
-            Center(
-              child: SizedBox(
-                width: size,
-                height: size,
-                child: CustomPaint(painter: _RadarPainter(values: values)),
-              ),
-            ),
-            ...List.generate(labels.length, (index) {
-              final angle =
-                  -math.pi / 2 + (2 * math.pi / labels.length) * index;
-              final radius = size / 2;
-              final labelRadius = radius + 28;
-              final cx = constraints.maxWidth / 2;
-              final cy = constraints.maxHeight / 2;
-              final x = cx + labelRadius * math.cos(angle);
-              final y = cy + labelRadius * math.sin(angle);
-
-              return Positioned(
-                left: x - 28,
-                top: y - 12,
+        return SizedBox(
+          width: double.infinity,
+          height: double.infinity,
+          child: Stack(
+            children: [
+              Center(
                 child: SizedBox(
-                  width: 56,
-                  child: Text(
-                    labels[index],
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      color: Color(0xFF6F6256),
-                      fontFamily: 'STKaiti',
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: CustomPaint(painter: _RadarPainter(values: values)),
+                ),
+              ),
+              ...List.generate(labels.length, (index) {
+                final angle =
+                    -math.pi / 2 + (2 * math.pi / labels.length) * index;
+                final radius = size / 2 - 8;
+                final labelRadius = radius;
+                final cx = constraints.maxWidth / 2;
+                final cy = constraints.maxHeight / 2;
+                final x = cx + labelRadius * math.cos(angle);
+                final y = cy + labelRadius * math.sin(angle);
+                Log.d('index: $index labels: ${labels[index]} x: $x y: $y');
+
+                return Positioned(
+                  left: x - 28,
+                  top: y - 12,
+                  child: SizedBox(
+                    width: 56,
+                    child: Text(
+                      labels[index],
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        color: Color(0xFF6F6256),
+                        fontFamily: 'STKaiti',
+                      ),
                     ),
                   ),
-                ),
-              );
-            }),
-          ],
+                );
+              }),
+            ],
+          ),
         );
       },
     );
@@ -374,7 +390,7 @@ class _RadarPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 8;
+    final radius = size.width / 2 - 36;
     const axes = 5;
 
     final gridPaint = Paint()
@@ -436,8 +452,10 @@ class _RadarPainter extends CustomPainter {
 class _MetricItem extends StatelessWidget {
   final String title;
   final String value;
+  final bool isUp;
+  final String change;
 
-  const _MetricItem(this.title, this.value);
+  const _MetricItem(this.title, this.value, this.isUp,this.change);
 
   @override
   Widget build(BuildContext context) {
@@ -458,14 +476,33 @@ class _MetricItem extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 20,
-              color: Color(0xFF244438),
-              fontFamily: 'STKaiti',
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: Color(0xFF244438),
+                  fontFamily: 'STKaiti',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                isUp ? '↗' : '↘',
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF3C9566),
+                ),
+              ),
+              Text(
+                change,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF3C9566),
+                ),
+              )
+
+            ],
           ),
         ],
       ),

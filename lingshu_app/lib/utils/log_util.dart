@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:logger/logger.dart';
 import 'package:path/path.dart' as path;
 
 class Log {

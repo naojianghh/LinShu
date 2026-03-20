@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../models/diagnosis_report.dart';
 import '../widgets/app_header.dart';
@@ -83,12 +84,41 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           const SizedBox(height: 20),
                           _buildAnalysisCompleteCard(),
                           const SizedBox(height: 24),
-                          _buildConstitutionInfo(),
-                          const SizedBox(height: 20),
-                          _buildTabSwitcher(),
-                          const SizedBox(height: 20),
-                          _buildTabContent(),
-                          const SizedBox(height: 32),
+                          Image.asset('assets/images/report_detail_type${widget.report.constitution == '平和质' ? 1 : 2}.png'),
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 24.w ,vertical: 24.h),
+                            decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      const Color(0xFFFFFEFB),
+                                      const Color(0xFFFDFCF7)
+                                    ]
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                                border: BoxBorder.all(color: const Color(0xFFE8DCC8)),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: const Color(0x263C9566),
+                                      offset: Offset(0, 2),
+                                      blurRadius: 2
+                                  )
+                                ]
+                            ),
+                            child: Column(
+                              children: [
+                                _buildConstitutionInfo(),
+                                const SizedBox(height: 20),
+                                _buildTabSwitcher(),
+                                const SizedBox(height: 20),
+                                _buildTabContent(),
+                                const SizedBox(height: 32),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
                           _buildBottomActions(context),
                           const SizedBox(height: 40),
                         ],
@@ -108,14 +138,20 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF2D4A3E),
-            fontFamily: 'STKaiti',
-          ),
+        Stack(
+          alignment: Alignment.bottomLeft,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2D4A3E),
+                fontFamily: 'STXinwei',
+              ),
+            ),
+            Image.asset('assets/images/sport_decoration.png', width: 120.w,),
+          ],
         ),
         const SizedBox(height: 4),
         Text(
@@ -181,14 +217,20 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '体质类型',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF2D4A3E),
-            fontFamily: 'STKaiti',
-          ),
+        Stack(
+          alignment: Alignment.bottomLeft,
+          children: [
+            const Text(
+              '体质类型',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2D4A3E),
+                fontFamily: 'STKaiti',
+              ),
+            ),
+            Image.asset('assets/images/sport_decoration.png', width: 100.w,),
+          ],
         ),
         const SizedBox(height: 16),
         Row(
@@ -213,30 +255,28 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5ED),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: const Color(0xFFA4D4B4),
-                    width: 0.5,
-                  ),
-                ),
-                child: Text(
-                  widget.report.pattern,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF2D7450),
-                    fontFamily: 'STKaiti',
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5ED),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFFA4D4B4),
+                  width: 0.5,
                 ),
               ),
-            ),
+              child: Text(
+                widget.report.pattern,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF2D7450),
+                  fontFamily: 'STKaiti',
+                ),
+              ),
+            )
           ],
         ),
       ],
@@ -245,10 +285,18 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
   Widget _buildTabSwitcher() {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F3ED),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFFF5F3ED),
+            const Color(0xFFECEAE0)
+          ]
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: BoxBorder.all(color: const Color(0xFFE8DCC8))
       ),
       child: Row(
         children: [
@@ -265,12 +313,25 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _selectedTab = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+        child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
+            gradient: isSelected ?  LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFFFFFEFB),
+                const Color(0xFFFFFEFB),
+              ]
+            ) : null,
             borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected ? [
+              BoxShadow(
+                color: const Color(0x263C9566),
+                offset: Offset(0, 2),
+                blurRadius: 2
+              )
+            ] : []
           ),
           child: Center(
             child: Text(
@@ -368,7 +429,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   }
 
   Widget _buildBottomActions(BuildContext context) {
-    return Column(
+    return Stack(
       children: [
         if (widget.report.riskWarning.isNotEmpty)
           Container(
@@ -401,54 +462,56 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               ],
             ),
           ),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3C9566),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () =>
-                    Navigator.of(context).popUntil((route) => route.isFirst),
-                child: const Text(
-                  '完成',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'STKaiti',
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _copySummary,
-                icon: const Icon(Icons.copy, size: 18),
-                label: const Text(
-                  '一键复制摘要',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'STKaiti',
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF2D4A3E),
-                  side: const BorderSide(color: Color(0xFFCAD5CC)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+        Padding(
+          padding: EdgeInsets.only(top: 48.h),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () =>
+                      Navigator.of(context).popUntil((route) => route.isFirst),
+                  child: Container(
+                    height: 100.h,
+                    decoration: BoxDecoration(
+                        image: DecorationImage(image: AssetImage('assets/images/buy_button_bg.png'),fit: BoxFit.fitHeight)
+                    ),
+                    child: Center(
+                      child: const Text(
+                        '完成',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'STKaiti',
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+              SizedBox(width: 8.w,),
+              Expanded(
+                child: GestureDetector(
+                  onTap: _copySummary,
+                  child: Container(
+                    height: 100.h,
+                    decoration: BoxDecoration(
+                        image: DecorationImage(image: AssetImage('assets/images/buy_button_bg.png'),fit: BoxFit.fitHeight)
+                    ),
+                    child: Center(
+                      child: const Text(
+                        '保存',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'STKaiti',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

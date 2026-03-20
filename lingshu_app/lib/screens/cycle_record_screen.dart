@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class CycleRecordScreen extends StatefulWidget {
   const CycleRecordScreen({super.key});
@@ -29,18 +30,16 @@ class _CycleRecordScreenState extends State<CycleRecordScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFDFCF7),
       appBar: AppBar(
+        centerTitle: false,
         backgroundColor: const Color(0xFFFDFCF7),
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        titleSpacing: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF6B5D4F)),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF6B5D4F)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           '生理周期记录',
           style: TextStyle(
-            fontSize: 24,
             color: Color(0xFF244438),
             fontFamily: 'STKaiti',
             fontWeight: FontWeight.bold,
@@ -48,20 +47,21 @@ class _CycleRecordScreenState extends State<CycleRecordScreen> {
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 14),
+            padding: EdgeInsets.only(right: 16.w),
             child: FilledButton.icon(
               onPressed: _showRecordDialog,
               style: FilledButton.styleFrom(
+                fixedSize: Size(74.w, 34.h),
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
                 backgroundColor: const Color(0xFFF54888),
-                minimumSize: const Size(64, 56),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              icon: const Icon(Icons.add, size: 20),
-              label: const Text(
+              icon: const Icon(Icons.add, size: 14),
+              label: Text(
                 '记录',
-                style: TextStyle(fontSize: 16, fontFamily: 'STKaiti'),
+                style: TextStyle(fontSize: 12.sp, fontFamily: 'STKaiti'),
               ),
             ),
           ),
@@ -274,6 +274,23 @@ class _CycleRecordScreenState extends State<CycleRecordScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
+            textTheme: TextTheme(
+              displayLarge: TextStyle(fontFamily: 'STKaiti'),
+              displayMedium: TextStyle(fontFamily: 'STKaiti'),
+              displaySmall: TextStyle(fontFamily: 'STKaiti'),
+              headlineLarge: TextStyle(fontFamily: 'STKaiti'),
+              headlineMedium: TextStyle(fontSize: 20, fontFamily: 'STKaiti'),
+              headlineSmall: TextStyle(fontFamily: 'STKaiti'),
+              titleLarge: TextStyle(fontFamily: 'STKaiti'),
+              titleMedium: TextStyle(fontFamily: 'STKaiti'),
+              titleSmall: TextStyle(fontFamily: 'STKaiti'),
+              bodyLarge: TextStyle(fontSize: 14, fontFamily: 'STKaiti'),
+              bodyMedium: TextStyle(fontSize: 12, fontFamily: 'STKaiti'),
+              bodySmall: TextStyle(fontFamily: 'STKaiti'),
+              labelLarge: TextStyle(fontFamily: 'STKaiti'),
+              labelMedium: TextStyle(fontFamily: 'STKaiti'),
+              labelSmall: TextStyle(fontFamily: 'STKaiti'),
+            ),
             colorScheme: const ColorScheme.light(
               primary: Color(0xFFF54888),
               onPrimary: Colors.white,
@@ -316,7 +333,7 @@ class _CycleRecordScreenState extends State<CycleRecordScreen> {
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: double.infinity,
-        height: 54,
+        height: 37.h,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: const Color(0xFFFCFCFA),
@@ -333,7 +350,7 @@ class _CycleRecordScreenState extends State<CycleRecordScreen> {
               child: Text(
                 isEmpty ? hint : text,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 12,
                   color: isEmpty
                       ? const Color(0xFF9D9287)
                       : const Color(0xFF244438),
@@ -353,137 +370,150 @@ class _CycleRecordScreenState extends State<CycleRecordScreen> {
   }
 
   void _showRecordDialog() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setInnerState) {
-            return Container(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-                left: 16,
-                right: 16,
-                top: 16,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '记录经期',
-                      style: TextStyle(
-                        fontSize: 32 / 2,
-                        color: Color(0xFF244438),
-                        fontFamily: 'STKaiti',
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      '经期开始日期 *',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'STKaiti',
-                        color: Color(0xFF6F6256),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _datePickerField(
-                      text: _formatDate(_periodStartDate),
-                      hint: '请选择开始日期',
-                      requiredField: true,
-                      onTap: () => _pickDate(
-                        isStart: true,
-                        setInnerState: setInnerState,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      '经期结束日期（可选）',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'STKaiti',
-                        color: Color(0xFF6F6256),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _datePickerField(
-                      text: _formatDate(_periodEndDate),
-                      hint: '请选择结束日期',
-                      onTap: () => _pickDate(
-                        isStart: false,
-                        setInnerState: setInnerState,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      '流量',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'STKaiti',
-                        color: Color(0xFF6F6256),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: List.generate(3, (i) {
-                        final labels = ['少量', '中量', '大量'];
-                        final selected = _flowIndex == i;
-                        return Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(right: i == 2 ? 0 : 8),
-                            child: FilledButton(
-                              onPressed: () =>
-                                  setInnerState(() => _flowIndex = i),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: selected
-                                    ? const Color(0xFFF54888)
-                                    : const Color(0xFFF4F3EF),
-                                foregroundColor: selected
-                                    ? Colors.white
-                                    : const Color(0xFF6F6256),
-                                minimumSize: const Size(0, 52),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                labels[i],
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontFamily: 'STKaiti',
-                                ),
+        return Dialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: 16.w),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: SizedBox(
+            height: 600.h,
+            child: StatefulBuilder(
+              builder: (context, setInnerState) {
+                return Padding(
+                  padding: EdgeInsets.all(
+                    16.r
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '记录经期',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF244438),
+                            fontFamily: 'STKaiti',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        const Row(
+                          children: [
+                            Text(
+                              '经期开始日期',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'STKaiti',
+                                color: Color(0xFF6F6256),
                               ),
                             ),
+                            Text(
+                              ' *',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'STKaiti',
+                                color: Color(0xFFFF4D8C),
+                              ),
+                            )
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+                        _datePickerField(
+                          text: _formatDate(_periodStartDate),
+                          hint: '请选择开始日期',
+                          requiredField: true,
+                          onTap: () => _pickDate(
+                            isStart: true,
+                            setInnerState: setInnerState,
                           ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      '症状（多选）',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'STKaiti',
-                        color: Color(0xFF6F6256),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _symptoms
-                          .map(
-                            (s) => ChoiceChip(
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '经期结束日期（可选）',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'STKaiti',
+                            color: Color(0xFF6F6256),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _datePickerField(
+                          text: _formatDate(_periodEndDate),
+                          hint: '请选择结束日期',
+                          onTap: () => _pickDate(
+                            isStart: false,
+                            setInnerState: setInnerState,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '流量',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'STKaiti',
+                            color: Color(0xFF6F6256),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 32.h,
+                          child: Row(
+                            children: List.generate(3, (i) {
+                              final labels = ['少量', '中量', '大量'];
+                              final selected = _flowIndex == i;
+                              return Expanded(
+                                child: Padding(
+                                  padding: EdgeInsets.only(right: i == 2 ? 0 : 8),
+                                  child: FilledButton(
+                                    onPressed: () =>
+                                        setInnerState(() => _flowIndex = i),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: selected
+                                          ? const Color(0xFFF54888)
+                                          : const Color(0xFFF4F3EF),
+                                      foregroundColor: selected
+                                          ? Colors.white
+                                          : const Color(0xFF6F6256),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      labels[i],
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontFamily: 'STKaiti',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '症状（多选）',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'STKaiti',
+                            color: Color(0xFF6F6256),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 0,
+                          children: _symptoms
+                              .map(
+                                (s) => ChoiceChip(
                               label: Text(
                                 s,
-                                style: const TextStyle(fontFamily: 'STKaiti'),
+                                style: const TextStyle(fontFamily: 'STKaiti',fontSize: 10),
                               ),
                               selected: _selectedSymptoms.contains(s),
                               selectedColor: const Color(0xFFFDD8E7),
@@ -503,97 +533,106 @@ class _CycleRecordScreenState extends State<CycleRecordScreen> {
                               },
                             ),
                           )
-                          .toList(),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      '备注',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'STKaiti',
-                        color: Color(0xFF6F6256),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _inputBox('记录今天的感受...', maxLines: 4),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(0, 54),
-                              backgroundColor: const Color(0xFFF4F3EF),
-                              foregroundColor: const Color(0xFF6F6256),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: const Text(
-                              '取消',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontFamily: 'STKaiti',
-                              ),
-                            ),
+                              .toList(),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '备注',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'STKaiti',
+                            color: Color(0xFF6F6256),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(0, 54),
-                              backgroundColor: const Color(0xFFF54888),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                        const SizedBox(height: 8),
+                        _inputBox('记录今天的感受...', maxLines: 4),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(0, 36),
+                                  backgroundColor: const Color(0xFFF4F3EF),
+                                  foregroundColor: const Color(0xFF6F6256),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Text(
+                                  '取消',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontFamily: 'STKaiti',
+                                  ),
+                                ),
                               ),
                             ),
-                            child: const Text(
-                              '保存',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontFamily: 'STKaiti',
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(0, 36),
+                                  backgroundColor: const Color(0xFFF54888),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Text(
+                                  '保存',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontFamily: 'STKaiti',
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-            );
-          },
+                  ),
+                );
+              },
+            ),
+          )
         );
       },
     );
   }
 
   Widget _inputBox(String hint, {int maxLines = 1}) {
-    return TextField(
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(
-          fontSize: 16,
-          fontFamily: 'STKaiti',
-          color: Color(0xFF9D9287),
+    return SizedBox(
+      height: 80.h,
+      child: TextField(
+        cursorColor: const Color(0xFFF54888),
+        maxLines: maxLines,
+        style: TextStyle(
+            fontSize: 12
         ),
-        filled: true,
-        fillColor: const Color(0xFFFCFCFA),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFE8DCC8)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFF54888)),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(
+            fontSize: 12,
+            fontFamily: 'STKaiti',
+            color: Color(0xFF9D9287),
+          ),
+          filled: true,
+          fillColor: const Color(0xFFFCFCFA),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Color(0xFFE8DCC8)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Color(0xFFF54888)),
+          ),
         ),
       ),
     );
