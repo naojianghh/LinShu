@@ -117,7 +117,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
           _featuredCard(drinks[0]),
           const SizedBox(height: 18),
           const Text(
-            '全部饮品',
+            '推荐饮品',
             style: TextStyle(
               fontSize: 34 / 2,
               fontFamily: 'STKaiti',
@@ -129,7 +129,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: drinks.length,
+            itemCount: drinks.length - 1,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               childAspectRatio: 0.62,
@@ -137,7 +137,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
               mainAxisSpacing: 10,
             ),
             itemBuilder: (context, index) {
-              return _drinkItem(drinks[index]);
+              return _drinkItem(drinks[index + 1]);
             },
           ),
         ],
@@ -197,10 +197,10 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _tag('经期', _insights?.cyclePhase == '经期', pink: true),
-              _tag('卵泡期', _insights?.cyclePhase == '卵泡期'),
-              _tag('排卵期', _insights?.cyclePhase == '排卵期'),
-              _tag('黄体期', _insights?.cyclePhase == '黄体期'),
+              _tag('经期', false, pink: _insights?.cyclePhase == '经期'),
+              _tag('卵泡期',false, pink:  _insights?.cyclePhase == '卵泡期'),
+              _tag('排卵期',false, pink: _insights?.cyclePhase == '排卵期'),
+              _tag('黄体期',false, pink: _insights?.cyclePhase == '黄体期'),
             ],
           ),
           const SizedBox(height: 12),

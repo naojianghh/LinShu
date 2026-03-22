@@ -244,6 +244,16 @@ class QwenService {
       "name": "name",
       "description": "description",
       "price": price,
+    },
+    {
+      "name": "name",
+      "description": "description",
+      "price": price,
+    },
+    {
+      "name": "name",
+      "description": "description",
+      "price": price,
     }
   ],
   "weekly_focus": "本周调理重点"
@@ -276,7 +286,7 @@ class QwenService {
           'response_format': {'type': 'json_object'},
         },
       );
-
+      Log.d('AI 请求响应：$response');
       final content =
           (response.data['choices'] as List).first['message']['content'];
       return jsonDecode((content as String).trim()) as Map<String, dynamic>;
