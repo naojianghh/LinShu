@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 
@@ -20,12 +21,12 @@ class Log {
 
   static void e(String message, {String? tag, Object? error, StackTrace? stackTrace}) {
     final formattedMessage = _formatMessage(message, tag);
-    debugPrint('🔥 E $formattedMessage');
+    _printWithSplitting('🔥 E $formattedMessage');
     if (error != null) {
-      debugPrint('Error: $error');
+      _printWithSplitting('Error: $error');
     }
     if (stackTrace != null) {
-      debugPrint('StackTrace: $stackTrace');
+      _printWithSplitting('StackTrace: $stackTrace');
     }
   }
 
@@ -35,13 +36,48 @@ class Log {
 
   static void _printLog(String level, String emoji, String message, String? tag) {
     final formattedMessage = _formatMessage(message, tag);
-    debugPrint('$emoji $level $formattedMessage');
+    _printWithSplitting('$emoji $level $formattedMessage');
   }
 
   static String _formatMessage(String message, String? tag) {
     final location = _getCallerLocation();
     final tagStr = tag != null && tag.isNotEmpty ? '[$tag]' : '';
-    return '$location $tagStr $message'.trim();
+    final processedMessage = _processMessage(message);
+    return '$location $tagStr $processedMessage'.trim();
+  }
+
+  static String _processMessage(String message) {
+    // 尝试检测并格式化JSON
+    try {
+      final trimmedMessage = message.trim();
+      if ((trimmedMessage.startsWith('{') && trimmedMessage.endsWith('}')) ||
+          (trimmedMessage.startsWith('[') && trimmedMessage.endsWith(']'))) {
+        final json = jsonDecode(trimmedMessage);
+        return jsonEncode(json, toEncodable: (object) {
+          if (object is Map || object is List) {
+            return object;
+          }
+          return object.toString();
+        });
+      }
+    } catch (e) {
+      // 不是有效的JSON，保持原样
+    }
+    return message;
+  }
+
+  static void _printWithSplitting(String message) {
+    const int chunkSize = 1000;
+    if (message.length <= chunkSize) {
+      debugPrint(message, wrapWidth: 2048);
+      return;
+    }
+
+    for (int i = 0; i < message.length; i += chunkSize) {
+      final end = (i + chunkSize < message.length) ? i + chunkSize : message.length;
+      final chunk = message.substring(i, end);
+      debugPrint('$chunk', wrapWidth: 2048);
+    }
   }
 
   static String _getCallerLocation() {

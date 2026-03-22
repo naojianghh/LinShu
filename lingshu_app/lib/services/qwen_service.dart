@@ -10,9 +10,9 @@ import '../models/diagnosis_report.dart';
 class QwenService {
   QwenService({Dio? dio}) : _dio = dio ?? Dio() {
     _dio.options = BaseOptions(
-      connectTimeout: const Duration(seconds: 8),
-      sendTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 25),
+      connectTimeout: const Duration(seconds: 60),
+      sendTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 60),
     );
   }
 
@@ -28,6 +28,7 @@ class QwenService {
   }) async {
     final base64Image = base64Encode(await imageFile.readAsBytes());
     final prompt = _getPrompt(type);
+    Log.d('分析图片prompt: $prompt');
 
     try {
       final response = await _dio.post(
@@ -85,6 +86,79 @@ class QwenService {
     }
   }
 
+  Future<Stream<String>> chatWithTcmAssistantStream({
+    required List<Map<String, String>> messages,
+  }) async {
+    final systemMessage = {
+      'role': 'system',
+      'content':
+      '你是灵枢·AI的中医健康助手。请用简洁、温和、可执行的中文回答。'
+          '你可以提供体质调理、作息、饮食、运动建议，但不能做医疗诊断。'
+          '若用户存在明显风险症状，要明确建议及时线下就医。'
+          '回答内容尽量引用《黄帝内经》，《女科经伦》和《伤寒杂病论》的一条或多条句子 ',
+    };
+
+    final recentMessages = messages.length > 12
+        ? messages.sublist(messages.length - 12)
+        : messages;
+
+    final payloadMessages = [
+      systemMessage,
+      ...recentMessages.map(
+            (m) => {'role': m['role'] ?? 'user', 'content': m['content'] ?? ''},
+      ),
+    ];
+
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/chat/completions',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $_apiKey',
+            'Content-Type': 'application/json',
+          },
+          responseType: ResponseType.stream,
+        ),
+        data: {
+          'model': _model,
+          'messages': payloadMessages,
+          'stream': true,
+        },
+      );
+
+      Stream<String> parseStream(Response<dynamic> response) async* {
+        final stream = response.data!.stream as Stream<List<int>>;
+        String buffer = '';
+
+        await for (final chunk in stream) {
+          buffer += utf8.decode(chunk);
+          final lines = buffer.split('\n');
+          buffer = lines.removeLast();
+
+          for (final line in lines) {
+            if (line.startsWith('data:')) {
+              final jsonStr = line.substring(5).trim();
+              if (jsonStr.isEmpty || jsonStr == '[DONE]') continue;
+              try {
+                final json = jsonDecode(jsonStr);
+                final content = json['choices']?[0]?['delta']?['content'];
+                if (content != null && content.toString().isNotEmpty) {
+                  yield content.toString();
+                }
+              } catch (e) {
+                // 忽略解析错误
+              }
+            }
+          }
+        }
+      }
+      return parseStream(response);
+    } catch (e) {
+      Log.d('流式问诊对话失败：$e');
+      throw Exception('流式问诊对话失败: $e');
+    }
+  }
+
   Future<String> chatWithTcmAssistant({
     required List<Map<String, String>> messages,
   }) async {
@@ -119,8 +193,7 @@ class QwenService {
         data: {
           'model': _model,
           'messages': payloadMessages,
-          'temperature': 0.5,
-          'max_tokens': 380,
+          'stream': true,
         },
       );
       Log.d('AI 请求响应：$response');
@@ -148,24 +221,45 @@ class QwenService {
 - 体质：$constitution
 - 证型：$pattern
 - 周期阶段：$cyclePhase
-- 望闻问切饮食建议：${dietaryAdvice.join('；')}
-- 望闻问切生活建议：${lifestyleAdvice.join('；')}
-- 望闻问切运动建议：${exerciseAdvice.join('；')}
 
-输出要求：
-- 严格输出 JSON 对象，不要 markdown。
-- 字段包含：
-  1) dietary_plan: 3-5条饮食方案
-  2) exercise_plan: 3条运动计划
-  3) care_advice: 3条护理建议
-  4) constitution_evolution: 3条体质演化趋势
-  5) wellness_recommendation: 3条养生推荐
-  6) drink_recommendations: 3条饮品推荐，每条包含 name、description、price
-  7) weekly_focus: 1条本周调理重点
-- 内容务必可执行，避免医疗诊断语气。
+输出 JSON 结构如下：
+{
+  "dietary_advice": ["建议1"],
+  "exercise_plan": ["计划1"],
+  "care_advice": ["建议1"],
+  "constitution_evolution": ["趋势1"],
+  "wellness_recommendation": ["建议1],
+  "drink_recommendations": [
+    {
+      "name": "name",
+      "description": "description",
+      "price": price,
+    },
+    {
+      "name": "name",
+      "description": "description",
+      "price": price,
+    },
+    {
+      "name": "name",
+      "description": "description",
+      "price": price,
+    }
+  ],
+  "weekly_focus": "本周调理重点"
+}
 ''';
 
     try {
+      Log.d('prompt: $prompt');
+      Log.d('用户信息：'
+        '- 体质：$constitution'
+        '- 证型：$pattern'
+        '- 周期阶段：$cyclePhase'
+        '- 望闻问切饮食建议：${dietaryAdvice.join('；')}'
+        '- 望闻问切生活建议：${lifestyleAdvice.join('；')}'
+        '- 望闻问切运动建议：${exerciseAdvice.join('；')}'
+        );
       final response = await _dio.post(
         '$_baseUrl/chat/completions',
         options: Options(
@@ -187,6 +281,7 @@ class QwenService {
           (response.data['choices'] as List).first['message']['content'];
       return jsonDecode((content as String).trim()) as Map<String, dynamic>;
     } catch (e) {
+      Log.d('女神专区AI规划失败: $e');
       throw Exception('女神专区AI规划失败: $e');
     }
   }
@@ -236,6 +331,7 @@ class QwenService {
           (response.data['choices'] as List).first['message']['content'];
       return jsonDecode((content as String).trim()) as Map<String, dynamic>;
     } catch (e) {
+      Log.d('心灵栖息地AI评估失败: $e');
       throw Exception('心灵栖息地AI评估失败: $e');
     }
   }

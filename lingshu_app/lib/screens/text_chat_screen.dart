@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lingshu_app/utils/log_util.dart';
 
 import '../services/qwen_service.dart';
 
@@ -48,21 +49,33 @@ class _TextChatScreenState extends State<TextChatScreen> {
     _scrollToBottom();
 
     try {
-      final response = await _qwenService.chatWithTcmAssistant(
+      final stream = await _qwenService.chatWithTcmAssistantStream(
         messages: _messages,
       );
-      if (!mounted) return;
-      setState(() {
-        _messages.add({'role': 'assistant', 'content': response});
-        _isSending = false;
-      });
+
+      String fullResponse = '';
+      await for (final chunk in stream) {
+        if (!mounted) return;
+        fullResponse += chunk;
+        setState(() {
+          _isSending = false;
+          // 最后一条消息实时更新
+          if (_messages.last['role'] == 'assistant') {
+            _messages.last['content'] = fullResponse;
+          } else {
+            _messages.add({'role': 'assistant', 'content': fullResponse});
+          }
+        });
+        _scrollToBottom();
+      }
     } catch (e) {
+      Log.d('error: $e');
       if (!mounted) return;
       final msg = e.toString();
       final timeoutLike =
           msg.contains('timeout') ||
-          msg.contains('连接超时') ||
-          msg.contains('接收超时');
+              msg.contains('连接超时') ||
+              msg.contains('接收超时');
       setState(() {
         _messages.add({
           'role': 'assistant',
@@ -74,7 +87,34 @@ class _TextChatScreenState extends State<TextChatScreen> {
       });
     }
 
-    _scrollToBottom();
+    // try {
+    //   final response = await _qwenService.chatWithTcmAssistant(
+    //     messages: _messages,
+    //   );
+    //   Log.d('response: $response');
+    //   if (!mounted) return;
+    //   setState(() {
+    //     _messages.add({'role': 'assistant', 'content': response});
+    //     _isSending = false;
+    //   });
+    // } catch (e) {
+    //   Log.d('error: $e');
+    //   if (!mounted) return;
+    //   final msg = e.toString();
+    //   final timeoutLike =
+    //       msg.contains('timeout') ||
+    //       msg.contains('连接超时') ||
+    //       msg.contains('接收超时');
+    //   setState(() {
+    //     _messages.add({
+    //       'role': 'assistant',
+    //       'content': timeoutLike
+    //           ? '网络较慢，响应超时。建议稍后重试或切换到更稳定的网络（如Wi-Fi）。'
+    //           : '抱歉，当前问诊服务暂时不可用，请稍后再试。',
+    //     });
+    //     _isSending = false;
+    //   });
+    // }
   }
 
   void _scrollToBottom() {

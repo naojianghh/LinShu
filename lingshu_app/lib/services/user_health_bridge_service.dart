@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:lingshu_app/utils/log_util.dart';
 
 import '../models/diagnosis_report.dart';
 import 'diagnosis_report_db.dart';
@@ -64,6 +65,7 @@ class UserHealthBridgeService {
     bool forceRefresh = false,
   }) async {
     final reports = await DiagnosisReportDb.instance.getReports(limit: 1);
+    Log.d('reports: ${reports.first.toMap()}',tag: 'getUnifiedInsights');
     final latest = reports.isNotEmpty ? reports.first : null;
 
     final cyclePhase = _calcCyclePhase(DateTime.now());
@@ -71,6 +73,7 @@ class UserHealthBridgeService {
         '${latest?.id ?? 'no_report'}-$cyclePhase-${DateTime.now().toIso8601String().substring(0, 10)}';
 
     if (!forceRefresh && _memoryCache != null && _cacheKey == currentKey) {
+      Log.d('提前return_memoryCache',tag: 'getUnifiedInsights');
       return _memoryCache!;
     }
 
@@ -82,14 +85,14 @@ class UserHealthBridgeService {
       lifestyleAdvice: latest?.lifestyleAdvice ?? const [],
       exerciseAdvice: latest?.exerciseAdvice ?? const [],
     );
-
+    Log.d('goddessRaw: ${goddessRaw.toString()}',tag: 'getUnifiedInsights');
     final mindRaw = await _qwenService.generateMindPlan(
       constitution: latest?.constitution ?? '信息不足',
       pattern: latest?.pattern ?? '信息不足',
       cyclePhase: cyclePhase,
       lifestyleAdvice: latest?.lifestyleAdvice ?? const [],
     );
-
+    Log.d('mindRaw: ${mindRaw.toString()}',tag: 'getUnifiedInsights');
     final goddessPlan = GoddessPlanData(
       dietaryPlan: _toList(goddessRaw['dietary_plan']),
       exercisePlan: _toList(goddessRaw['exercise_plan']),
@@ -99,14 +102,14 @@ class UserHealthBridgeService {
       weeklyFocus: (goddessRaw['weekly_focus'] as String?) ?? '本周以稳定作息、温和调理为主。',
       drinkRecommendations: _toDrinkList(goddessRaw['drink_recommendations']),
     );
-
+    Log.d('goddessPlan: ${goddessPlan.toString()}',tag: 'getUnifiedInsights');
     final mindPlan = MindPlanData(
       stressIndex: _toIntInRange(mindRaw['stress_index'], 0, 100, 60),
       relaxPercent: _toIntInRange(mindRaw['relax_percent'], 0, 100, 72),
       suggestion:
           (mindRaw['suggestion'] as String?) ?? '建议优先进行10~15分钟的呼吸冥想，再安排轻度运动。',
     );
-
+    Log.d('mindPlan: ${mindPlan.toString()}',tag: 'getUnifiedInsights');
     final insights = UnifiedHealthInsights(
       latestReport: latest,
       cyclePhase: cyclePhase,
