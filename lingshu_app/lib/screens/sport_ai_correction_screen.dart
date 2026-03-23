@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../models/user_calibration.dart';
+import '../services/dtw_pose_matcher.dart';
 import '../services/pose_analyse.dart';
 import '../utils/log_util.dart';
 
@@ -53,9 +54,7 @@ class PoseLandmarkPainter extends CustomPainter {
 
         // 绘制关键点
         canvas.drawCircle(position, 3.0, paint);
-        if (type.name == 'nose') {
-          Log.d('绘制点位: name: ${type.name} 转换后: (${position.dx}, ${position.dy})', tag: 'PoseRender2');
-        }
+        Log.d('绘制点位: name: ${type.name}, 原始点位: (${landmark.x},${landmark.y}) 转换后: (${position.dx}, ${position.dy})', tag: 'PoseRender2');
 
         // 绘制点位名称
         _drawLandmarkName(canvas, textPainter, type.name, position);
@@ -147,12 +146,39 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
   late SportSequenceManager _sportSequenceManager;
   bool _isSequenceCompleted = false;
 
+  // DTW（第1式：双手托天）比对
+  late final DtwPoseMatcher _dtwMatcher;
+  bool _dtwReady = false;
+
+  // 当前 step 纠错：连续低准确度触发重置
+  int _lowAccuracyStreak = 0;
+  static const int _lowAccuracyFramesToRetry = 15; // 约半秒左右（取决于帧率）
+  DateTime? _lastRetryTime;
+  static const Duration _retryCooldown = Duration(seconds: 2);
+
   @override
   void initState() {
     super.initState();
 
     _initializeCalibrationSystem();
     _initDetector();
+
+    _dtwMatcher = DtwPoseMatcher();
+    _initDtwTemplate();
+  }
+
+  Future<void> _initDtwTemplate() async {
+    try {
+      await _dtwMatcher.loadTemplateFromAsset(
+        assetPath: 'assets/video/baduanjin_step1_dtw_template.json',
+      );
+      if (mounted) {
+        setState(() => _dtwReady = true);
+      }
+      Log.d('DTW 模板加载成功', tag: 'DTW');
+    } catch (e) {
+      Log.e('DTW 模板加载失败: $e', tag: 'DTW');
+    }
   }
 
   void _initializeCalibrationSystem() {
@@ -761,7 +787,54 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
       return;
     }
 
-    // 使用新的动作分析系统
+    // DTW：仅对第1式（双手托天）使用模板比对
+    final bool useDtw = _dtwReady && _sportSequenceManager.currentStep.actionType == '双手托天';
+    if (useDtw) {
+      final vec = _dtwMatcher.extractFeatureVector(pose);
+      _checkResults = {};
+
+      if (vec != null) {
+        final leftWristRelYUp = vec[2];
+        final rightWristRelYUp = vec[3];
+        final shoulderYDiff = vec[4];
+        final torsoCenterX = vec[5];
+
+        // 轨迹检测：不用肘角，改用“手腕相对鼻子高度足够高”来近似判断伸展到位。
+        _checkResults['手臂伸展'] = leftWristRelYUp > 0.05 && rightWristRelYUp > 0.05;
+        _checkResults['腰背挺直'] = shoulderYDiff < 0.02;
+        // 呼吸自然无法单帧可靠判断，这里用躯干稳定性做近似
+        _checkResults['呼吸自然'] = torsoCenterX < 0.05;
+      }
+
+      // 在线匹配：出现足够匹配的片段就判定完成（不会再返回“不通过”）
+      final dtwResult = _dtwMatcher.updateOnline(pose);
+      // 没进入在线评估前，不展示 lastSimilarity，避免“没开始动作相似度就跳起来”
+      final sim = _dtwMatcher.isOnlineStarted ? (_dtwMatcher.lastSimilarity ?? 0.0) : 0.0;
+      _poseAccuracy = sim;
+      _isActionCompleted = false;
+
+      if (dtwResult != null) {
+        _poseAccuracy = dtwResult.similarity;
+        _isActionCompleted = dtwResult.passed;
+        _currentSuggestion = '通过！相似度: ${dtwResult.similarity.toStringAsFixed(0)}%';
+
+        if (dtwResult.passed) {
+          Future.delayed(const Duration(seconds: 1), () {
+            _nextActionStep();
+          });
+        }
+      } else {
+        _currentSuggestion = '匹配中... 相似度: ${sim.toStringAsFixed(0)}%';
+      }
+
+      Log.d('DTW: ready=$_dtwReady completed=$_isActionCompleted acc=$_poseAccuracy', tag: 'DTW');
+      return;
+    }
+
+    // 使用新的动作分析系统（非第1式）
+    // 先尽早检测“开始点”，便于在做错后可以重置并重新采集起点/终点。
+    _sportSequenceManager.detectActionStart(pose);
+
     final result = _actionAnalyzer.analyzeAction(
       pose,
       _sportSequenceManager.currentStep.actionType,
@@ -772,6 +845,32 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     
     // 分析轨迹是否完成当前动作
     _isActionCompleted = _sportSequenceManager.analyzeTrajectory(pose, result);
+
+    // 如果动作偏差较大（准确度持续较低），且已经检测到开始点，则重置当前 step 的点集并重新检测
+    final hasDetectedStart = _sportSequenceManager.startLandmarks != null;
+    final bool shouldRetry = !_isActionCompleted &&
+        hasDetectedStart &&
+        _poseAccuracy < 50;
+
+    if (shouldRetry) {
+      _lowAccuracyStreak++;
+      final now = DateTime.now();
+      final cooldownOk = _lastRetryTime == null || now.difference(_lastRetryTime!) >= _retryCooldown;
+
+      if (_lowAccuracyStreak >= _lowAccuracyFramesToRetry && cooldownOk) {
+        _sportSequenceManager.retryCurrentStep();
+        _lastRetryTime = now;
+        _lowAccuracyStreak = 0;
+
+        setState(() {
+          _isActionCompleted = false;
+          _currentSuggestion = '动作偏差较大，已重置，请重新开始 ${_sportSequenceManager.currentStep.name}';
+        });
+        return; // 退出，避免下面的默认建议覆盖本次“重置”提示
+      }
+    } else {
+      _lowAccuracyStreak = 0;
+    }
 
     // 更新检查结果
     _checkResults = {};

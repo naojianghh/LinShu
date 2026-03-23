@@ -96,7 +96,7 @@ class Log {
           if (match != null) {
             final fileName = path.basename('${match.group(1) ?? ''}.dart');
             final lineNumber = match.group(2) ?? '';
-            return ' $fileName:$lineNumber';
+            return ' $fileName:$lineNumber.dart';
           }
         }
       }

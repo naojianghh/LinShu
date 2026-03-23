@@ -40,6 +40,12 @@ class SportSequenceManager {
   final Map<PoseLandmarkType, int> _targetPositionHoldTime = {};
   static const int _minHoldFrames = 5; // 最小保持帧数（约0.5秒）
 
+  // 动作开始检测（更早触发：用于记录起始点）
+  static const int _minStartHoldFrames = 2; // 最小保持帧数（起点触发更快）
+  final Map<PoseLandmarkType, int> _startPositionHoldTime = {};
+  bool _hasDetectedStart = false;
+  Map<PoseLandmarkType, PoseLandmark>? _startLandmarks;
+
   // 校准系统
   UserCalibration? _userCalibration;
 
@@ -142,6 +148,75 @@ class SportSequenceManager {
     }
 
     return isActionCompleted;
+  }
+
+  /// 检测当前动作是否“开始”（用于记录起始点/终止点）。
+  /// 逻辑：当 `currentStep.targetPositions` 中的各关键点相对条件在连续帧内成立，则判定开始，并缓存起始帧的关键点快照。
+  /// 注意：该方法只会在每个 step 内触发一次。
+  bool detectActionStart(Pose pose) {
+    if (_hasDetectedStart) return false;
+    final targetPositions = currentStep.targetPositions;
+    if (targetPositions == null || targetPositions.isEmpty) return false;
+
+    Log.d('开始检测 - 动作: ${currentStep.name}', tag: 'StartDetect');
+
+    bool allPositionsReached = true;
+    bool allPositionsHeld = true;
+
+    for (final entry in targetPositions.entries) {
+      final landmarkType = entry.key;
+      final targetConfig = entry.value;
+
+      final currentLandmark = pose.landmarks[landmarkType];
+      if (currentLandmark == null) {
+        allPositionsReached = false;
+        allPositionsHeld = false;
+        _startPositionHoldTime[landmarkType] = 0;
+        continue;
+      }
+
+      final isPositionReached = _checkPositionRequirement(pose, landmarkType, targetConfig);
+      if (!isPositionReached) {
+        allPositionsReached = false;
+        _startPositionHoldTime[landmarkType] = 0;
+        allPositionsHeld = false;
+        continue;
+      }
+
+      _startPositionHoldTime[landmarkType] = (_startPositionHoldTime[landmarkType] ?? 0) + 1;
+      if ((_startPositionHoldTime[landmarkType] ?? 0) < _minStartHoldFrames) {
+        allPositionsHeld = false;
+      }
+    }
+
+    // 满足：全部相对条件已成立且连续保持足够帧数
+    if (allPositionsReached && allPositionsHeld) {
+      _hasDetectedStart = true;
+      _startLandmarks = _clonePoseLandmarks(pose);
+      Log.d('动作开始检测成功 - 动作: ${currentStep.name}', tag: 'StartDetect');
+      return true;
+    }
+
+    return false;
+  }
+
+  /// 获取检测到的起始关键点快照（detectActionStart() 触发后可用）
+  Map<PoseLandmarkType, PoseLandmark>? get startLandmarks => _startLandmarks;
+
+  Map<PoseLandmarkType, PoseLandmark> _clonePoseLandmarks(Pose pose) {
+    final cloned = <PoseLandmarkType, PoseLandmark>{};
+    for (final entry in pose.landmarks.entries) {
+      final type = entry.key;
+      final v = entry.value;
+      cloned[type] = PoseLandmark(
+        x: v.x,
+        y: v.y,
+        z: v.z,
+        type: v.type,
+        likelihood: v.likelihood,
+      );
+    }
+    return cloned;
   }
 
   // 检查轨迹
@@ -1143,6 +1218,15 @@ class SportSequenceManager {
     }
   }
 
+  /// 当前 step 做错/偏差较大时，重置当前 step 的采样点集与开始检测状态，
+  /// 让 UI 可以重新“开始采集轨迹 + 重新检测开始点/动作完成”。
+  void retryCurrentStep() {
+    _clearTrajectories();
+    _clearHoldTimes();
+    _canRecord = true; // 允许重新采集轨迹点
+    Log.d('retryCurrentStep - 当前动作: ${currentStep.name}', tag: tag);
+  }
+
   // 重置序列
   void reset() {
     _currentStepIndex = 0;
@@ -1160,5 +1244,8 @@ class SportSequenceManager {
   // 清除保持时间
   void _clearHoldTimes() {
     _targetPositionHoldTime.clear();
+    _startPositionHoldTime.clear();
+    _hasDetectedStart = false;
+    _startLandmarks = null;
   }
 }
