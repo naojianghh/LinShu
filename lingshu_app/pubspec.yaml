@@ -51,6 +51,7 @@ flutter:
     - assets/images/goddess_new/
     - assets/video/
     - assets/fonts/
+    - assets/template/
     - .env
   fonts:
     - family: STXinwei

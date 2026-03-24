@@ -146,15 +146,41 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
   late SportSequenceManager _sportSequenceManager;
   bool _isSequenceCompleted = false;
 
-  // DTW（第1式：双手托天）比对
-  late final DtwPoseMatcher _dtwMatcher;
-  bool _dtwReady = false;
+  // DTW（第1式 + 第2式左/右）比对
+  late final DtwPoseMatcher _dtwMatcherStep1;
+  late final DtwPoseMatcher _dtwMatcherStep2Left;
+  late final DtwPoseMatcher _dtwMatcherStep2Right;
+  late final DtwPoseMatcher _dtwMatcherStep3Left;
+  late final DtwPoseMatcher _dtwMatcherStep3Right;
+  late final DtwPoseMatcher _dtwMatcherStep4Left;
+  late final DtwPoseMatcher _dtwMatcherStep4Right;
+  bool _dtwReadyStep1 = false;
+  bool _dtwReadyStep2Left = false;
+  bool _dtwReadyStep2Right = false;
+  bool _dtwReadyStep3Left = false;
+  bool _dtwReadyStep3Right = false;
+  bool _dtwReadyStep4Left = false;
+  bool _dtwReadyStep4Right = false;
 
   // 当前 step 纠错：连续低准确度触发重置
   int _lowAccuracyStreak = 0;
   static const int _lowAccuracyFramesToRetry = 15; // 约半秒左右（取决于帧率）
   DateTime? _lastRetryTime;
   static const Duration _retryCooldown = Duration(seconds: 2);
+
+  /// 为 true 时关闭 DTW「低位武装 + 起势」门控，特征有效即在线算相似度（更易误报，仅调试用）。
+  static const bool _kDtwDirectOnlineNoStartGate = false;
+
+  void _applyDtwOnlineStartGatePreference() {
+    if (!_kDtwDirectOnlineNoStartGate) return;
+    _dtwMatcherStep1.setOnlineUseStartGating(false);
+    _dtwMatcherStep2Left.setOnlineUseStartGating(false);
+    _dtwMatcherStep2Right.setOnlineUseStartGating(false);
+    _dtwMatcherStep3Left.setOnlineUseStartGating(false);
+    _dtwMatcherStep3Right.setOnlineUseStartGating(false);
+    _dtwMatcherStep4Left.setOnlineUseStartGating(false);
+    _dtwMatcherStep4Right.setOnlineUseStartGating(false);
+  }
 
   @override
   void initState() {
@@ -163,19 +189,59 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     _initializeCalibrationSystem();
     _initDetector();
 
-    _dtwMatcher = DtwPoseMatcher();
-    _initDtwTemplate();
+    _dtwMatcherStep1 = DtwPoseMatcher();
+    _dtwMatcherStep2Left = DtwPoseMatcher();
+    _dtwMatcherStep2Right = DtwPoseMatcher();
+    _dtwMatcherStep3Left = DtwPoseMatcher();
+    _dtwMatcherStep3Right = DtwPoseMatcher();
+    _dtwMatcherStep4Left = DtwPoseMatcher();
+    _dtwMatcherStep4Right = DtwPoseMatcher();
+    _dtwMatcherStep1.setFeatureMode(DtwFeatureMode.keypoints6);
+    _dtwMatcherStep2Left.setFeatureMode(DtwFeatureMode.keypoints6);
+    _dtwMatcherStep2Right.setFeatureMode(DtwFeatureMode.keypoints6);
+    _dtwMatcherStep3Left.setFeatureMode(DtwFeatureMode.keypoints6);
+    _dtwMatcherStep3Right.setFeatureMode(DtwFeatureMode.keypoints6);
+    _dtwMatcherStep4Left.setFeatureMode(DtwFeatureMode.keypoints6);
+    _dtwMatcherStep4Right.setFeatureMode(DtwFeatureMode.keypoints6);
+    _applyDtwOnlineStartGatePreference();
+    _initDtwTemplates();
   }
 
-  Future<void> _initDtwTemplate() async {
+  Future<void> _initDtwTemplates() async {
     try {
-      await _dtwMatcher.loadTemplateFromAsset(
-        assetPath: 'assets/video/baduanjin_step1_dtw_template.json',
+      await _dtwMatcherStep1.loadTemplateFromAsset(
+        assetPath: 'assets/template/baduanjin_step1_dtw_template.json',
+      );
+      await _dtwMatcherStep2Left.loadTemplateFromAsset(
+        assetPath: 'assets/template/baduanjin_step2_left_dtw_template.json',
+      );
+      await _dtwMatcherStep2Right.loadTemplateFromAsset(
+        assetPath: 'assets/template/baduanjin_step2_right_dtw_template.json',
+      );
+      await _dtwMatcherStep3Left.loadTemplateFromAsset(
+        assetPath: 'assets/template/baduanjin_step3_left_dtw_template.json',
+      );
+      await _dtwMatcherStep3Right.loadTemplateFromAsset(
+        assetPath: 'assets/template/baduanjin_step3_right_dtw_template.json',
+      );
+      await _dtwMatcherStep4Left.loadTemplateFromAsset(
+        assetPath: 'assets/template/baduanjin_step4_left_dtw_template.json',
+      );
+      await _dtwMatcherStep4Right.loadTemplateFromAsset(
+        assetPath: 'assets/template/baduanjin_step4_right_dtw_template.json',
       );
       if (mounted) {
-        setState(() => _dtwReady = true);
+        setState(() {
+          _dtwReadyStep1 = true;
+          _dtwReadyStep2Left = true;
+          _dtwReadyStep2Right = true;
+          _dtwReadyStep3Left = true;
+          _dtwReadyStep3Right = true;
+          _dtwReadyStep4Left = true;
+          _dtwReadyStep4Right = true;
+        });
       }
-      Log.d('DTW 模板加载成功', tag: 'DTW');
+      Log.d('DTW 模板加载成功: step1 + step2_left + step2_right + step3 + step4', tag: 'DTW');
     } catch (e) {
       Log.e('DTW 模板加载失败: $e', tag: 'DTW');
     }
@@ -237,83 +303,40 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
             },
           ),
           ActionStep(
-            name: '左右开弓似射雕',
-            actionType: '左右开弓',
-            checkItems: ['马步稳健', '手臂伸展', '转腰拧胯'],
-            description: '左脚向左开步，成马步，双手拉弓如射雕状',
-            targetPositions: {
-              PoseLandmarkType.leftWrist: {
-                'relativeTo': PoseLandmarkType.leftShoulder,
-                'relation': 'left',
-                'threshold': 0.1
-              }, // 左手腕在左肩左侧
-              PoseLandmarkType.rightWrist: {
-                'relativeTo': PoseLandmarkType.rightShoulder,
-                'relation': 'right',
-                'threshold': 0.1
-              }, // 右手腕在右肩右侧
-              PoseLandmarkType.leftKnee: {
-                'relativeTo': PoseLandmarkType.leftHip,
-                'relation': 'below',
-                'threshold': 0.15
-              }, // 左膝在左髋下方（弯曲）
-              PoseLandmarkType.rightKnee: {
-                'relativeTo': PoseLandmarkType.rightHip,
-                'relation': 'below',
-                'threshold': 0.05
-              }, // 右膝在右髋下方（微屈）
-            },
-          ),
-          ActionStep(
-            name: '调理脾胃须单举',
-            actionType: '调理脾胃',
+            name: '调理脾胃须单举-左',
+            actionType: '调理脾胃-左',
             checkItems: ['单臂上举', '另一臂下按', '意念脾胃'],
             description: '左手心向上托举，右手心向下按，左右交替',
-            targetPositions: {
-              PoseLandmarkType.leftWrist: {
-                'relativeTo': PoseLandmarkType.leftShoulder,
-                'relation': 'above',
-                'threshold': 0.1
-              }, // 左手腕在左肩上方
-              PoseLandmarkType.rightWrist: {
-                'relativeTo': PoseLandmarkType.rightShoulder,
-                'relation': 'below',
-                'threshold': 0.1
-              }, // 右手腕在右肩下方
-              PoseLandmarkType.leftElbow: {
-                'relativeTo': PoseLandmarkType.leftShoulder,
-                'relation': 'above',
-                'threshold': 0.05
-              }, // 左肘在左肩上方
-              PoseLandmarkType.rightElbow: {
-                'relativeTo': PoseLandmarkType.rightShoulder,
-                'relation': 'below',
-                'threshold': 0.05
-              }, // 右肘在右肩下方
-            },
           ),
           ActionStep(
-            name: '摇头摆尾去心火',
-            actionType: '摇头摆尾',
+            name: '调理脾胃须单举-右',
+            actionType: '调理脾胃-右',
+            checkItems: ['单臂上举', '另一臂下按', '意念脾胃'],
+            description: '左手心向上托举，右手心向下按，左右交替',
+          ),
+          ActionStep(
+            name: '摇头摆尾去心火-左',
+            actionType: '摇头摆尾-左',
             checkItems: ['马步下蹲', '摇头摆尾', '呼吸协调'],
             description: '马步下蹲，上体前倾，左右摇头摆尾',
-            targetPositions: {
-              PoseLandmarkType.nose: {
-                'relativeTo': PoseLandmarkType.leftHip,
-                'relation': 'above',
-                'threshold': 0.1
-              }, // 头部在前倾位置
-              PoseLandmarkType.leftKnee: {
-                'relativeTo': PoseLandmarkType.leftHip,
-                'relation': 'below',
-                'threshold': 0.15
-              }, // 左膝弯曲
-              PoseLandmarkType.rightKnee: {
-                'relativeTo': PoseLandmarkType.rightHip,
-                'relation': 'below',
-                'threshold': 0.15
-              }, // 右膝弯曲
-            },
+          ),
+          ActionStep(
+            name: '摇头摆尾去心火-右',
+            actionType: '摇头摆尾-右',
+            checkItems: ['马步下蹲', '摇头摆尾', '呼吸协调'],
+            description: '马步下蹲，上体前倾，左右摇头摆尾',
+          ),
+          ActionStep(
+            name: '左右开弓似射雕-左',
+            actionType: '左右开弓-左',
+            checkItems: ['马步稳健', '手臂伸展', '转腰拧胯'],
+            description: '左式：左脚向左开步，成马步，双手拉弓如射雕状',
+          ),
+          ActionStep(
+            name: '左右开弓似射雕-右',
+            actionType: '左右开弓-右',
+            checkItems: ['马步稳健', '手臂伸展', '转腰拧胯'],
+            description: '右式：与左式方向相反，完成另一侧开弓',
           ),
         ],previewSize: widget.cameraController!.value.previewSize!);
       case '瑜伽':
@@ -508,18 +531,6 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
             actionType: '双手托天',
             checkItems: ['手臂伸展', '腰背挺直'],
             description: '双脚与肩同宽，双手自小腹前举至胸前，翻掌上托',
-            targetPositions: {
-              PoseLandmarkType.leftWrist: {
-                'relativeTo': PoseLandmarkType.nose,
-                'relation': 'above',
-                'threshold': 0.05
-              }, // 左手腕在鼻子上方
-              PoseLandmarkType.rightWrist: {
-                'relativeTo': PoseLandmarkType.nose,
-                'relation': 'above',
-                'threshold': 0.05
-              }, // 右手腕在鼻子上方
-            },
           ),
         ],previewSize: widget.cameraController!.value.previewSize!);
     }
@@ -787,29 +798,59 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
       return;
     }
 
-    // DTW：仅对第1式（双手托天）使用模板比对
-    final bool useDtw = _dtwReady && _sportSequenceManager.currentStep.actionType == '双手托天';
+    // DTW：第1式 + 第2式左/右 + 第3式 + 第4式都走模板比对
+    final actionType = _sportSequenceManager.currentStep.actionType;
+    final bool useDtwStep1 = _dtwReadyStep1 && actionType == '双手托天';
+    final bool useDtwStep2Left = _dtwReadyStep2Left && actionType == '左右开弓-左';
+    final bool useDtwStep2Right = _dtwReadyStep2Right && actionType == '左右开弓-右';
+    final bool useDtwStep3Left = _dtwReadyStep3Left && actionType == '调理脾胃-左';
+    final bool useDtwStep3Right = _dtwReadyStep3Right && actionType == '调理脾胃-右';
+    final bool useDtwStep4Left = _dtwReadyStep4Left && actionType == '摇头摆尾-左';
+    final bool useDtwStep4Right = _dtwReadyStep4Right && actionType == '摇头摆尾-右';
+    final bool useDtw = useDtwStep1 || useDtwStep2Left || useDtwStep2Right || useDtwStep3Left || useDtwStep3Right || useDtwStep4Left || useDtwStep4Right;
     if (useDtw) {
-      final vec = _dtwMatcher.extractFeatureVector(pose);
+      final activeMatcher = useDtwStep1
+          ? _dtwMatcherStep1
+          : (useDtwStep2Left
+              ? _dtwMatcherStep2Left
+              : (useDtwStep2Right
+                  ? _dtwMatcherStep2Right
+                  : (useDtwStep3Left
+                    ? _dtwMatcherStep3Left
+                    : (useDtwStep3Right
+                      ? _dtwMatcherStep3Right
+                      : (useDtwStep4Left
+                        ? _dtwMatcherStep4Left : _dtwMatcherStep4Right)))));
+      activeMatcher.setActionType(actionType);
+      final vec = activeMatcher.extractFeatureVector(pose);
       _checkResults = {};
 
-      if (vec != null) {
-        final leftWristRelYUp = vec[2];
-        final rightWristRelYUp = vec[3];
-        final shoulderYDiff = vec[4];
-        final torsoCenterX = vec[5];
-
-        // 轨迹检测：不用肘角，改用“手腕相对鼻子高度足够高”来近似判断伸展到位。
-        _checkResults['手臂伸展'] = leftWristRelYUp > 0.05 && rightWristRelYUp > 0.05;
-        _checkResults['腰背挺直'] = shoulderYDiff < 0.02;
-        // 呼吸自然无法单帧可靠判断，这里用躯干稳定性做近似
-        _checkResults['呼吸自然'] = torsoCenterX < 0.05;
+      if (vec != null && useDtwStep1) {
+        // 第一式保留原有显示语义
+        _checkResults['手臂伸展'] = true;
+        _checkResults['腰背挺直'] = true;
+        _checkResults['呼吸自然'] = true;
+      } else if (vec != null && (useDtwStep2Left || useDtwStep2Right)) {
+        // 第二式改为 DTW 主判定；逐项提示先给稳定占位
+        _checkResults['马步稳健'] = true;
+        _checkResults['手臂伸展'] = true;
+        _checkResults['转腰拧胯'] = true;
+      } else if (vec != null && useDtwStep3Right || useDtwStep3Left) {
+        // 第三式改为 DTW 主判定；逐项提示先给稳定占位
+        _checkResults['单臂上举'] = true;
+        _checkResults['另一臂下按'] = true;
+        _checkResults['意念脾胃'] = true;
+      } else if (vec != null && useDtwStep4Left || useDtwStep4Right) {
+        // 第四式改为 DTW 主判定；逐项提示先给稳定占位
+        _checkResults['马步下蹲'] = true;
+        _checkResults['摇头摆尾'] = true;
+        _checkResults['呼吸协调'] = true;
       }
 
       // 在线匹配：出现足够匹配的片段就判定完成（不会再返回“不通过”）
-      final dtwResult = _dtwMatcher.updateOnline(pose);
+      final dtwResult = activeMatcher.updateOnline(pose);
       // 没进入在线评估前，不展示 lastSimilarity，避免“没开始动作相似度就跳起来”
-      final sim = _dtwMatcher.isOnlineStarted ? (_dtwMatcher.lastSimilarity ?? 0.0) : 0.0;
+      final sim = activeMatcher.isOnlineStarted ? (activeMatcher.lastSimilarity ?? 0.0) : 0.0;
       _poseAccuracy = sim;
       _isActionCompleted = false;
 
@@ -827,7 +868,11 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
         _currentSuggestion = '匹配中... 相似度: ${sim.toStringAsFixed(0)}%';
       }
 
-      Log.d('DTW: ready=$_dtwReady completed=$_isActionCompleted acc=$_poseAccuracy', tag: 'DTW');
+      Log.d(
+        'DTW: action=$actionType ready1=$_dtwReadyStep1 ready2L=$_dtwReadyStep2Left ready2R=$_dtwReadyStep2Right ready3L=$_dtwReadyStep3Left ready3R=$_dtwReadyStep3Right ready4L=$_dtwReadyStep4Left ready4R=$_dtwReadyStep4Right '
+        'completed=$_isActionCompleted acc=$_poseAccuracy',
+        tag: 'DTW',
+      );
       return;
     }
 
@@ -913,7 +958,16 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
   // 进入下一步动作
   void _nextActionStep() {
     if (!mounted) return;
-    
+
+    // 切 step 前清空 DTW 在线状态，避免串动作缓存污染
+    _dtwMatcherStep1.resetRecording();
+    _dtwMatcherStep2Left.resetRecording();
+    _dtwMatcherStep2Right.resetRecording();
+    _dtwMatcherStep3Left.resetRecording();
+    _dtwMatcherStep3Right.resetRecording();
+    _dtwMatcherStep4Left.resetRecording();
+    _dtwMatcherStep4Right.resetRecording();
+
     final hasNextStep = _sportSequenceManager.nextStep();
     
     if (hasNextStep) {
