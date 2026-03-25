@@ -67,14 +67,14 @@ class _GoddessScreenState extends State<GoddessScreen> {
   Future<void> _loadInsights() async {
     try {
       final data = await _bridgeService.getUnifiedInsights();
-      Log.d('_loadInsights: ${data}');
+      Log.d('_loadInsights: $data');
       if (!mounted) return;
       setState(() {
         _insights = data;
       });
     } catch (e) {
       // 使用静态兜底数据
-      Log.d('_loadInsights: ${e}');
+      Log.d('_loadInsights: $e');
     }
   }
 
@@ -275,7 +275,7 @@ class _GoddessScreenState extends State<GoddessScreen> {
     final phase = _insights?.cyclePhase ?? '卵泡期';
     final constitution = _insights?.latestReport?.constitution ?? '待分析';
     return Container(
-      height: 220.h,
+      height: 236.h,
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(33.w, 44.h,33.w, 0),
       decoration: BoxDecoration(
@@ -344,7 +344,7 @@ class _GoddessScreenState extends State<GoddessScreen> {
           ),
           SizedBox(height: 9.h),
           Container(
-            height: 80.h,
+            height: 96.h,
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(

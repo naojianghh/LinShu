@@ -10,104 +10,7 @@ import '../models/user_calibration.dart';
 import '../services/dtw_pose_matcher.dart';
 import '../services/pose_analyse.dart';
 import '../utils/log_util.dart';
-
-// 关键点渲染器
-class PoseLandmarkPainter extends CustomPainter {
-  final Pose? pose;
-  final Size previewSize;
-  final CameraLensDirection cameraLensDirection;
-
-  PoseLandmarkPainter({
-    required this.pose,
-    required this.previewSize,
-    required this.cameraLensDirection,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (pose == null) return;
-
-    final paint = Paint()
-      ..color = Colors.green
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.fill;
-
-    final textPainter = TextPainter(
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-    );
-
-    // 要渲染的关键点类型
-    final landmarkTypes = [
-      PoseLandmarkType.nose,
-      PoseLandmarkType.leftWrist,
-      PoseLandmarkType.rightWrist,
-      PoseLandmarkType.leftElbow,
-      PoseLandmarkType.rightElbow,
-    ];
-
-    for (final type in landmarkTypes) {
-      final landmark = pose!.landmarks[type];
-      if (landmark != null) {
-        // 转换坐标
-        final position = _calculatePosition(landmark, size, type.name);
-
-        // 绘制关键点
-        canvas.drawCircle(position, 3.0, paint);
-        Log.d('绘制点位: name: ${type.name}, 原始点位: (${landmark.x},${landmark.y}) 转换后: (${position.dx}, ${position.dy})', tag: 'PoseRender2');
-
-        // 绘制点位名称
-        _drawLandmarkName(canvas, textPainter, type.name, position);
-      }
-    }
-  }
-
-  Offset _calculatePosition(PoseLandmark landmark, Size size,String name) {
-
-    // 转换坐标（考虑相机方向）
-    double x = landmark.x;
-    double y = landmark.y;
-
-    y = previewSize.width - y;
-
-    // 调整坐标
-    final adjustedX = x;
-    final adjustedY = y;
-
-    return Offset(adjustedX, adjustedY);
-  }
-
-  void _drawLandmarkName(Canvas canvas, TextPainter textPainter, String name, Offset position) {
-    final textSpan = TextSpan(
-      text: name,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 6,
-        fontWeight: FontWeight.bold,
-        backgroundColor: Colors.black54,
-      ),
-    );
-
-    textPainter.text = textSpan;
-    textPainter.layout();
-
-    // 绘制文本
-    textPainter.paint(
-      canvas,
-      Offset(
-        position.dx - textPainter.width / 2,
-        position.dy - textPainter.height - 10,
-      ),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
-  }
-}
-
-
+import '../utils/pose_landmark_painter.dart';
 
 class SportAiCorrectionScreen extends StatefulWidget {
   final String sportType;
@@ -135,8 +38,8 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
 
   // 用户校准和动作分析相关
   late UserCalibration _userCalibration;
-  late ActionAnalyzer _actionAnalyzer;
-  late UserProfile _userProfile;
+  // late ActionAnalyzer _actionAnalyzer;
+  // late UserProfile _userProfile;
   bool _isCalibrating = false;
   bool _isCalibrated = false;
   bool _isActionCompleted = false;
@@ -145,6 +48,13 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
   // 运动序列管理
   late SportSequenceManager _sportSequenceManager;
   bool _isSequenceCompleted = false;
+
+  // camera 图像流控制：用“会话 token”解决校准/检测切换时的竞态，
+  // 用“并发闸门”解决每帧 processImage 的重入与结果乱序。
+  bool _disposed = false;
+  int _streamSessionId = 0; // 每次开始一段流会话就递增
+  bool _isPoseStreamRunning = false;
+  bool _isProcessingFrame = false;
 
   // DTW（第1式 + 第2式左/右）比对
   late final DtwPoseMatcher _dtwMatcherStep1;
@@ -162,11 +72,11 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
   bool _dtwReadyStep4Left = false;
   bool _dtwReadyStep4Right = false;
 
-  // 当前 step 纠错：连续低准确度触发重置
-  int _lowAccuracyStreak = 0;
-  static const int _lowAccuracyFramesToRetry = 15; // 约半秒左右（取决于帧率）
-  DateTime? _lastRetryTime;
-  static const Duration _retryCooldown = Duration(seconds: 2);
+  // // 当前 step 纠错：连续低准确度触发重置
+  // int _lowAccuracyStreak = 0;
+  // static const int _lowAccuracyFramesToRetry = 15; // 约半秒左右（取决于帧率）
+  // DateTime? _lastRetryTime;
+  // static const Duration _retryCooldown = Duration(seconds: 2);
 
   /// 为 true 时关闭 DTW「低位武装 + 起势」门控，特征有效即在线算相似度（更易误报，仅调试用）。
   static const bool _kDtwDirectOnlineNoStartGate = false;
@@ -249,21 +159,21 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
 
   void _initializeCalibrationSystem() {
     // 初始化用户资料（实际应用中可以从存储或用户输入获取）
-    _userProfile = UserProfile(
-      height: 170, // 默认身高170cm
-      armSpan: 170, // 默认臂展170cm
-      gender: 'male',
-    );
+    // _userProfile = UserProfile(
+    //   height: 170, // 默认身高170cm
+    //   armSpan: 170, // 默认臂展170cm
+    //   gender: 'male',
+    // );
 
     // 初始化校准和分析器
     _userCalibration = UserCalibration();
-    final thresholdManager = DynamicThresholdManager();
-    _actionAnalyzer = ActionAnalyzer(_userCalibration, thresholdManager);
+    //final thresholdManager = DynamicThresholdManager();
+    //_actionAnalyzer = ActionAnalyzer(_userCalibration, thresholdManager);
 
     // 初始化运动序列管理器
     _sportSequenceManager = _createSportSequenceManager();
     // 设置校准系统
-    _sportSequenceManager.setUserCalibration(_userCalibration);
+    //_sportSequenceManager.setUserCalibration(_userCalibration);
 
     // 开始校准流程
     _startCalibration();
@@ -542,49 +452,91 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     );
   }
 
-  void _startCalibration() {
-    setState(() {
-      _isCalibrating = true;
-      _calibrationMessage = '请自然站立，双脚与肩同宽，双臂自然下垂';
-    });
+  void _stopCameraImageStream() {
+    if (_disposed) return;
+    if (!_isPoseStreamRunning) return;
+    try {
+      widget.cameraController?.stopImageStream();
+    } catch (_) {}
+    _isPoseStreamRunning = false;
+  }
 
-    // 延迟3秒后捕获校准姿势
+  void _startCalibration() {
+    if (_disposed) return;
+
+    // 新开启一次校准会话：让任何旧的回调全部失效
+    _streamSessionId++;
+    final sessionId = _streamSessionId;
+
+    // 避免“实时检测流”和“校准流”重复 startImageStream
+    _stopCameraImageStream();
+
+    if (mounted) {
+      setState(() {
+        _isCalibrating = true;
+        _isCalibrated = false;
+        _calibrationMessage = '请自然站立，双脚与肩同宽，双臂自然下垂';
+      });
+    }
+
+    // 延迟3秒后捕获校准姿势（带会话 token 校验）
     Future.delayed(const Duration(seconds: 3), () {
-      _captureCalibrationPose();
+      if (_disposed || !mounted || sessionId != _streamSessionId) return;
+      _captureCalibrationPose(sessionId);
     });
   }
 
   // 捕获校准姿势
-  Future<void> _captureCalibrationPose() async {
+  Future<void> _captureCalibrationPose(int sessionId) async {
     try {
+      if (_disposed || !mounted || sessionId != _streamSessionId) return;
+
       if (widget.cameraController == null || !widget.cameraController!.value.isInitialized) {
-        setState(() {
-          _calibrationMessage = '相机未初始化，无法校准';
-          _isCalibrating = false;
-        });
+        if (mounted && sessionId == _streamSessionId) {
+          setState(() {
+            _calibrationMessage = '相机未初始化，无法校准';
+            _isCalibrating = false;
+          });
+        }
         return;
       }
 
+      // 再次停止流，确保只存在一个 imageStream
+      _stopCameraImageStream();
+
       // 开始3秒倒计时
       for (int i = 3; i > 0; i--) {
-        setState(() {
-          _calibrationMessage = '请保持姿势稳定\n$i';
-        });
+        if (_disposed || sessionId != _streamSessionId) return;
+        if (mounted) {
+          setState(() {
+            _calibrationMessage = '请保持姿势稳定\n$i';
+          });
+        }
         await Future.delayed(const Duration(seconds: 1));
       }
 
       // 倒计时结束，开始捕获后三帧
-      setState(() {
-        _calibrationMessage = '正在捕获姿势...';
-      });
+      if (_disposed || sessionId != _streamSessionId) return;
+      if (mounted) {
+        setState(() {
+          _calibrationMessage = '正在捕获姿势...';
+        });
+      }
 
       // 从相机流中获取后三帧用于校准
       List<Pose> capturedPoses = [];
       bool captureCompleted = false;
       
+      _isPoseStreamRunning = true;
       await widget.cameraController!.startImageStream((CameraImage image) async {
+        // 只允许当前会话的流回调生效
+        if (_disposed || sessionId != _streamSessionId) {
+          _stopCameraImageStream();
+          return;
+        }
+
         if (captureCompleted || capturedPoses.length >= 3) {
-          widget.cameraController?.stopImageStream();
+          _stopCameraImageStream();
           return;
         }
         
@@ -592,6 +544,8 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
           final inputImage = _convertCameraImage(image);
           if (inputImage != null) {
             final poses = await _poseDetector.processImage(inputImage);
+            // processImage 可能较慢：await 之后再校验一次会话/生命周期
+            if (_disposed || sessionId != _streamSessionId || !mounted) return;
             if (poses.isNotEmpty) {
               capturedPoses.add(poses.first);
               Log.d('捕获到第 ${capturedPoses.length}/3 帧姿势', tag: 'Calibration');
@@ -617,15 +571,19 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
                 Log.d('右膝位置: x=${standardPose.landmarks[PoseLandmarkType.rightKnee]?.x ?? 'N/A'}, y=${standardPose.landmarks[PoseLandmarkType.rightKnee]?.y ?? 'N/A'}', tag: 'Calibration');
                 Log.d('左脚踝位置: x=${standardPose.landmarks[PoseLandmarkType.leftAnkle]?.x ?? 'N/A'}, y=${standardPose.landmarks[PoseLandmarkType.leftAnkle]?.y ?? 'N/A'}', tag: 'Calibration');
                 Log.d('右脚踝位置: x=${standardPose.landmarks[PoseLandmarkType.rightAnkle]?.x ?? 'N/A'}, y=${standardPose.landmarks[PoseLandmarkType.rightAnkle]?.y ?? 'N/A'}', tag: 'Calibration');
-                setState(() {
-                  _isCalibrating = false;
-                  _isCalibrated = true;
-                  _calibrationMessage = '校准完成！';
-                });
+                if (mounted && sessionId == _streamSessionId) {
+                  setState(() {
+                    _isCalibrating = false;
+                    _isCalibrated = true;
+                    _calibrationMessage = '校准完成！';
+                  });
+                }
 
-                // 校准完成后停止当前流并启动实时分析
-                widget.cameraController?.stopImageStream();
-                _startPoseDetectionStream();
+                // 校准完成后停止当前流并启动实时分析（同一会话 token）
+                _stopCameraImageStream();
+                if (!_disposed && mounted && sessionId == _streamSessionId) {
+                  _startPoseDetectionStream(sessionId);
+                }
               }
             }
           }
@@ -636,19 +594,22 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
 
       // 超时处理
       Future.delayed(const Duration(seconds: 10), () {
+        if (_disposed || !mounted || sessionId != _streamSessionId) return;
         if (!captureCompleted) {
           setState(() {
             _calibrationMessage = '校准超时，请重试';
             _isCalibrating = false;
           });
-          widget.cameraController?.stopImageStream();
+          _stopCameraImageStream();
         }
       });
     } catch (e) {
-      setState(() {
-        _calibrationMessage = '校准失败，请重试';
-        _isCalibrating = false;
-      });
+      if (mounted && sessionId == _streamSessionId) {
+        setState(() {
+          _calibrationMessage = '校准失败，请重试';
+          _isCalibrating = false;
+        });
+      }
     }
   }
 
@@ -703,23 +664,36 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     return Pose(landmarks: averageLandmarks);
   }
 
-  void _startPoseDetectionStream() {
+  void _startPoseDetectionStream(int sessionId) {
     if (widget.cameraController == null || !widget.cameraController!.value.isInitialized) {
       Log.d('启动动作检测流失败 widget.cameraController == null: ${widget.cameraController == null} !widget.cameraController!.value.isInitialized: ${!widget.cameraController!.value.isInitialized}', tag: 'analyzePose');
       return;
     }
 
+    // 避免重复启动
+    if (_isPoseStreamRunning) return;
+
+    _isPoseStreamRunning = true;
+
     Log.d('启动动作检测流', tag: 'analyzePose');
     widget.cameraController!.startImageStream((CameraImage image) async {
-      // 移除 _isDetecting 检查，让每一帧都处理
-      // if (_isDetecting) return;
-      // _isDetecting = true;
+      if (_disposed || sessionId != _streamSessionId) {
+        _stopCameraImageStream();
+        return;
+      }
+      if (!mounted) return;
+
+      // 并发闸门：同一时刻只处理一帧，避免 processImage 重入导致结果乱序
+      if (_isProcessingFrame) return;
+      _isProcessingFrame = true;
 
       try {
         final inputImage = _convertCameraImage(image);
         if (inputImage == null) return;
 
         final poses = await _poseDetector.processImage(inputImage);
+
+        if (_disposed || sessionId != _streamSessionId || !mounted) return;
 
         if (poses.isNotEmpty) {
           _currentPose = poses.first;
@@ -728,13 +702,11 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
           _currentPose = null;
         }
 
-        if (mounted) {
-          setState(() {});
-        }
+        if (mounted && sessionId == _streamSessionId) setState(() {});
       } catch (e) {
         Log.e('检测错误：$e', tag: 'Pose');
       } finally {
-        // _isDetecting = false;
+        _isProcessingFrame = false;
       }
     });
   }
@@ -807,7 +779,7 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     final bool useDtwStep3Right = _dtwReadyStep3Right && actionType == '调理脾胃-右';
     final bool useDtwStep4Left = _dtwReadyStep4Left && actionType == '摇头摆尾-左';
     final bool useDtwStep4Right = _dtwReadyStep4Right && actionType == '摇头摆尾-右';
-    final bool useDtw = useDtwStep1 || useDtwStep2Left || useDtwStep2Right || useDtwStep3Left || useDtwStep3Right || useDtwStep4Left || useDtwStep4Right;
+    final bool useDtw = true;
     if (useDtw) {
       final activeMatcher = useDtwStep1
           ? _dtwMatcherStep1
@@ -876,83 +848,83 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
       return;
     }
 
-    // 使用新的动作分析系统（非第1式）
-    // 先尽早检测“开始点”，便于在做错后可以重置并重新采集起点/终点。
-    _sportSequenceManager.detectActionStart(pose);
-
-    final result = _actionAnalyzer.analyzeAction(
-      pose,
-      _sportSequenceManager.currentStep.actionType,
-      _userProfile,
-    );
-
-    _poseAccuracy = result.similarity * 100;
-    
-    // 分析轨迹是否完成当前动作
-    _isActionCompleted = _sportSequenceManager.analyzeTrajectory(pose, result);
-
-    // 如果动作偏差较大（准确度持续较低），且已经检测到开始点，则重置当前 step 的点集并重新检测
-    final hasDetectedStart = _sportSequenceManager.startLandmarks != null;
-    final bool shouldRetry = !_isActionCompleted &&
-        hasDetectedStart &&
-        _poseAccuracy < 50;
-
-    if (shouldRetry) {
-      _lowAccuracyStreak++;
-      final now = DateTime.now();
-      final cooldownOk = _lastRetryTime == null || now.difference(_lastRetryTime!) >= _retryCooldown;
-
-      if (_lowAccuracyStreak >= _lowAccuracyFramesToRetry && cooldownOk) {
-        _sportSequenceManager.retryCurrentStep();
-        _lastRetryTime = now;
-        _lowAccuracyStreak = 0;
-
-        setState(() {
-          _isActionCompleted = false;
-          _currentSuggestion = '动作偏差较大，已重置，请重新开始 ${_sportSequenceManager.currentStep.name}';
-        });
-        return; // 退出，避免下面的默认建议覆盖本次“重置”提示
-      }
-    } else {
-      _lowAccuracyStreak = 0;
-    }
-
-    // 更新检查结果
-    _checkResults = {};
-    if (result.angles.isNotEmpty) {
-      // 根据角度结果更新检查项
-      if (result.angles.containsKey('leftElbow') && result.angles.containsKey('rightElbow')) {
-        final leftElbowAngle = result.angles['leftElbow']!;
-        final rightElbowAngle = result.angles['rightElbow']!;
-        _checkResults['手臂伸展'] = leftElbowAngle > 160 && rightElbowAngle > 160;
-      }
-
-      if (result.angles.containsKey('leftKnee') && result.angles.containsKey('rightKnee')) {
-        final leftKneeAngle = result.angles['leftKnee']!;
-        final rightKneeAngle = result.angles['rightKnee']!;
-        _checkResults['双腿伸直'] = leftKneeAngle > 160 && rightKneeAngle > 160;
-      }
-    }
-
-    // 更新建议
-    if (_isActionCompleted) {
-      _currentSuggestion = '动作完成！准备进入下一步...';
-      // 延迟一秒后进入下一步
-      Future.delayed(const Duration(seconds: 1), () {
-        _nextActionStep();
-      });
-    } else if (_poseAccuracy >= 80) {
-      _currentSuggestion = '姿势标准，继续保持！';
-    } else if (_poseAccuracy >= 50) {
-      _currentSuggestion = '姿势基本正确，可适当调整';
-    } else {
-      _currentSuggestion = '请调整姿势，按提示纠正';
-    }
-
-    Log.d('检查项: $_checkResults', tag: 'analyzePose');
-    Log.d('准确度: ${_poseAccuracy.toStringAsFixed(1)}%', tag: 'analyzePose');
-    Log.d('提示: $_currentSuggestion', tag: 'analyzePose');
-    Log.d('当前动作: ${_sportSequenceManager.currentStep.name} (${_sportSequenceManager.currentStepIndex}/${_sportSequenceManager.totalSteps})', tag: 'analyzePose');
+    // // 使用新的动作分析系统（非第1式）
+    // // 先尽早检测“开始点”，便于在做错后可以重置并重新采集起点/终点。
+    // _sportSequenceManager.detectActionStart(pose);
+    //
+    // final result = _actionAnalyzer.analyzeAction(
+    //   pose,
+    //   _sportSequenceManager.currentStep.actionType,
+    //   _userProfile,
+    // );
+    //
+    // _poseAccuracy = result.similarity * 100;
+    //
+    // // 分析轨迹是否完成当前动作
+    // _isActionCompleted = _sportSequenceManager.analyzeTrajectory(pose, result);
+    //
+    // // 如果动作偏差较大（准确度持续较低），且已经检测到开始点，则重置当前 step 的点集并重新检测
+    // final hasDetectedStart = _sportSequenceManager.startLandmarks != null;
+    // final bool shouldRetry = !_isActionCompleted &&
+    //     hasDetectedStart &&
+    //     _poseAccuracy < 50;
+    //
+    // if (shouldRetry) {
+    //   _lowAccuracyStreak++;
+    //   final now = DateTime.now();
+    //   final cooldownOk = _lastRetryTime == null || now.difference(_lastRetryTime!) >= _retryCooldown;
+    //
+    //   if (_lowAccuracyStreak >= _lowAccuracyFramesToRetry && cooldownOk) {
+    //     _sportSequenceManager.retryCurrentStep();
+    //     _lastRetryTime = now;
+    //     _lowAccuracyStreak = 0;
+    //
+    //     setState(() {
+    //       _isActionCompleted = false;
+    //       _currentSuggestion = '动作偏差较大，已重置，请重新开始 ${_sportSequenceManager.currentStep.name}';
+    //     });
+    //     return; // 退出，避免下面的默认建议覆盖本次“重置”提示
+    //   }
+    // } else {
+    //   _lowAccuracyStreak = 0;
+    // }
+    //
+    // // 更新检查结果
+    // _checkResults = {};
+    // if (result.angles.isNotEmpty) {
+    //   // 根据角度结果更新检查项
+    //   if (result.angles.containsKey('leftElbow') && result.angles.containsKey('rightElbow')) {
+    //     final leftElbowAngle = result.angles['leftElbow']!;
+    //     final rightElbowAngle = result.angles['rightElbow']!;
+    //     _checkResults['手臂伸展'] = leftElbowAngle > 160 && rightElbowAngle > 160;
+    //   }
+    //
+    //   if (result.angles.containsKey('leftKnee') && result.angles.containsKey('rightKnee')) {
+    //     final leftKneeAngle = result.angles['leftKnee']!;
+    //     final rightKneeAngle = result.angles['rightKnee']!;
+    //     _checkResults['双腿伸直'] = leftKneeAngle > 160 && rightKneeAngle > 160;
+    //   }
+    // }
+    //
+    // // 更新建议
+    // if (_isActionCompleted) {
+    //   _currentSuggestion = '动作完成！准备进入下一步...';
+    //   // 延迟一秒后进入下一步
+    //   Future.delayed(const Duration(seconds: 1), () {
+    //     _nextActionStep();
+    //   });
+    // } else if (_poseAccuracy >= 80) {
+    //   _currentSuggestion = '姿势标准，继续保持！';
+    // } else if (_poseAccuracy >= 50) {
+    //   _currentSuggestion = '姿势基本正确，可适当调整';
+    // } else {
+    //   _currentSuggestion = '请调整姿势，按提示纠正';
+    // }
+    //
+    // Log.d('检查项: $_checkResults', tag: 'analyzePose');
+    // Log.d('准确度: ${_poseAccuracy.toStringAsFixed(1)}%', tag: 'analyzePose');
+    // Log.d('提示: $_currentSuggestion', tag: 'analyzePose');
+    // Log.d('当前动作: ${_sportSequenceManager.currentStep.name} (${_sportSequenceManager.currentStepIndex}/${_sportSequenceManager.totalSteps})', tag: 'analyzePose');
   }
 
   // 进入下一步动作
@@ -1016,8 +988,13 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
 
   @override
   void dispose() {
-    widget.cameraController?.stopImageStream();
-    _poseDetector.close();
+    _disposed = true;
+    _streamSessionId++; // 使得任何挂起的延迟/回调全部失效
+    _isProcessingFrame = false;
+    _isPoseStreamRunning = false;
+
+    _stopCameraImageStream();
+    _poseDetector.close(); // 释放 MLKit 资源
     super.dispose();
   }
 

@@ -26,7 +26,7 @@ class DiagnosisReportDb {
 
     return openDatabase(
       dbPath,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE $_tableName(
@@ -39,9 +39,21 @@ class DiagnosisReportDb {
             lifestyleAdvice TEXT NOT NULL,
             exerciseAdvice TEXT NOT NULL,
             riskWarning TEXT NOT NULL,
-            imageUrl TEXT
+            imageUrl TEXT,
+            goddessPlanJson TEXT,
+            mindPlanJson TEXT
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute(
+            'ALTER TABLE $_tableName ADD COLUMN goddessPlanJson TEXT',
+          );
+          await db.execute(
+            'ALTER TABLE $_tableName ADD COLUMN mindPlanJson TEXT',
+          );
+        }
       },
     );
   }

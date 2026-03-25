@@ -3,7 +3,6 @@ import 'package:lingshu_app/utils/log_util.dart';
 
 import '../models/diagnosis_report.dart';
 import 'diagnosis_report_db.dart';
-import 'qwen_service.dart';
 
 class GoddessPlanData {
   final List<String> dietaryPlan;
@@ -56,8 +55,6 @@ class UserHealthBridgeService {
 
   static final UserHealthBridgeService instance = UserHealthBridgeService._();
 
-  final QwenService _qwenService = QwenService();
-
   UnifiedHealthInsights? _memoryCache;
   String? _cacheKey;
 
@@ -65,8 +62,34 @@ class UserHealthBridgeService {
     bool forceRefresh = false,
   }) async {
     final reports = await DiagnosisReportDb.instance.getReports(limit: 1);
-    Log.d('reports: ${reports.first.toMap()}',tag: 'getUnifiedInsights');
     final latest = reports.isNotEmpty ? reports.first : null;
+
+    Log.d(
+      '基础信息: '
+          'id=${latest?.id}, type=${latest?.type}, date=${latest?.date.toIso8601String()}',
+      tag: 'report',
+    );
+    Log.d(
+      '体质: constitution=${latest?.constitution}, pattern=${latest?.pattern}',
+      tag: 'report',
+    );
+    Log.d(
+      '建议: dietary=${latest?.dietaryAdvice}, '
+          'lifestyle=${latest?.lifestyleAdvice}, exercise=${latest?.exerciseAdvice}',
+      tag: 'report',
+    );
+    Log.d(
+      '风险提示: ${latest?.riskWarning}',
+      tag: 'report',
+    );
+    Log.d(
+      '女神计划JSON: ${latest?.goddessPlan.toJson()}',
+      tag: 'report',
+    );
+    Log.d(
+      '心灵计划JSON: ${latest?.mindPlan.toJson()}',
+      tag: 'report',
+    );
 
     final cyclePhase = _calcCyclePhase(DateTime.now());
     final currentKey =
@@ -77,39 +100,23 @@ class UserHealthBridgeService {
       return _memoryCache!;
     }
 
-    final goddessRaw = await _qwenService.generateGoddessPlan(
-      constitution: latest?.constitution ?? '信息不足',
-      pattern: latest?.pattern ?? '信息不足',
-      cyclePhase: cyclePhase,
-      dietaryAdvice: latest?.dietaryAdvice ?? const [],
-      lifestyleAdvice: latest?.lifestyleAdvice ?? const [],
-      exerciseAdvice: latest?.exerciseAdvice ?? const [],
-    );
-    Log.d('goddessRaw: ${goddessRaw.toString()}',tag: 'getUnifiedInsights');
-    final mindRaw = await _qwenService.generateMindPlan(
-      constitution: latest?.constitution ?? '信息不足',
-      pattern: latest?.pattern ?? '信息不足',
-      cyclePhase: cyclePhase,
-      lifestyleAdvice: latest?.lifestyleAdvice ?? const [],
-    );
-    Log.d('mindRaw: ${mindRaw.toString()}',tag: 'getUnifiedInsights');
+    final goddessPlanRaw = latest?.goddessPlan ?? GoddessPlan.empty();
+    final mindPlanRaw = latest?.mindPlan ?? MindPlan.empty();
+
     final goddessPlan = GoddessPlanData(
-      dietaryPlan: _toList(goddessRaw['dietary_plan']),
-      exercisePlan: _toList(goddessRaw['exercise_plan']),
-      careAdvice: _toList(goddessRaw['care_advice']),
-      constitutionEvolution: _toList(goddessRaw['constitution_evolution']),
-      wellnessRecommendation: _toList(goddessRaw['wellness_recommendation']),
-      weeklyFocus: (goddessRaw['weekly_focus'] as String?) ?? '本周以稳定作息、温和调理为主。',
-      drinkRecommendations: _toDrinkList(goddessRaw['drink_recommendations']),
+      dietaryPlan: goddessPlanRaw.dietaryAdvice,
+      exercisePlan: goddessPlanRaw.exercisePlan,
+      careAdvice: goddessPlanRaw.careAdvice,
+      constitutionEvolution: goddessPlanRaw.constitutionEvolution,
+      wellnessRecommendation: goddessPlanRaw.wellnessRecommendation,
+      weeklyFocus: goddessPlanRaw.weeklyFocus,
+      drinkRecommendations: goddessPlanRaw.drinkRecommendations,
     );
-    Log.d('goddessPlan: ${goddessPlan.toString()}',tag: 'getUnifiedInsights');
     final mindPlan = MindPlanData(
-      stressIndex: _toIntInRange(mindRaw['stress_index'], 0, 100, 60),
-      relaxPercent: _toIntInRange(mindRaw['relax_percent'], 0, 100, 72),
-      suggestion:
-          (mindRaw['suggestion'] as String?) ?? '建议优先进行10~15分钟的呼吸冥想，再安排轻度运动。',
+      stressIndex: mindPlanRaw.stressIndex,
+      relaxPercent: mindPlanRaw.relaxPercent,
+      suggestion: mindPlanRaw.suggestion,
     );
-    Log.d('mindPlan: ${mindPlan.toString()}',tag: 'getUnifiedInsights');
     final insights = UnifiedHealthInsights(
       latestReport: latest,
       cyclePhase: cyclePhase,
@@ -138,6 +145,20 @@ class UserHealthBridgeService {
       lifestyleAdvice: insights.goddessPlan.careAdvice.take(3).toList(),
       exerciseAdvice: insights.goddessPlan.exercisePlan.take(2).toList(),
       riskWarning: insights.goddessPlan.weeklyFocus,
+      goddessPlan: GoddessPlan(
+        dietaryAdvice: insights.goddessPlan.dietaryPlan,
+        exercisePlan: insights.goddessPlan.exercisePlan,
+        careAdvice: insights.goddessPlan.careAdvice,
+        constitutionEvolution: insights.goddessPlan.constitutionEvolution,
+        wellnessRecommendation: insights.goddessPlan.wellnessRecommendation,
+        weeklyFocus: insights.goddessPlan.weeklyFocus,
+        drinkRecommendations: insights.goddessPlan.drinkRecommendations,
+      ),
+      mindPlan: MindPlan(
+        stressIndex: insights.mindPlan.stressIndex,
+        relaxPercent: insights.mindPlan.relaxPercent,
+        suggestion: insights.mindPlan.suggestion,
+      ),
     );
     try {
       await DiagnosisReportDb.instance.insertReport(report);
@@ -154,38 +175,4 @@ class UserHealthBridgeService {
     return '黄体期';
   }
 
-  List<String> _toList(dynamic value) {
-    if (value is List) {
-      return value
-          .map((e) => e.toString())
-          .where((e) => e.trim().isNotEmpty)
-          .toList();
-    }
-    return const [];
-  }
-
-  List<Map<String, String>> _toDrinkList(dynamic value) {
-    if (value is! List) return const [];
-    return value
-        .whereType<Map>()
-        .map(
-          (e) => {
-            'name': (e['name'] ?? '').toString(),
-            'description': (e['description'] ?? '').toString(),
-            'price': (e['price'] ?? '').toString(),
-          },
-        )
-        .where((e) => e['name']!.isNotEmpty)
-        .toList();
-  }
-
-  int _toIntInRange(dynamic value, int min, int max, int fallback) {
-    final numValue = value is num
-        ? value.toInt()
-        : int.tryParse(value?.toString() ?? '');
-    if (numValue == null) return fallback;
-    if (numValue < min) return min;
-    if (numValue > max) return max;
-    return numValue;
-  }
 }

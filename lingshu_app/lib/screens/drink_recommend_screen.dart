@@ -43,26 +43,36 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
       setState(() {
         _insights = insights;
         if (generated.isNotEmpty) {
-          final imagePool = const [
-            'assets/images/goddess_tea1.png',
-            'assets/images/goddess_tea2.png',
-            'assets/images/goddess_tea3.png',
-            'assets/images/goddess_tea4.png',
-          ];
-          final detailImagePool = const [
-            'assets/images/goddess_new/drink_1.png',
-            'assets/images/goddess_new/drink_2.png',
-            'assets/images/goddess_new/drink_3.png',
-            'assets/images/goddess_new/drink_4.png',
-          ];
+          const teaImages = {
+            1: 'assets/images/goddess_tea1.png',
+            2: 'assets/images/goddess_tea2.png',
+            3: 'assets/images/goddess_tea3.png',
+            4: 'assets/images/goddess_tea4.png',
+            5: 'assets/images/goddess_tea5.png',
+          };
+
+          int pickTeaNo(String rawName) {
+            final name = rawName.replaceAll(' ', '');
+
+            // 优先级按你的规则：枣 > 百合/银耳 > 玫瑰/花 > 桂圆；否则兜底茶5
+            if (name.contains('枣')) return 1;
+            if (name.contains('百合') || name.contains('银耳')) return 2;
+            if (name.contains('玫瑰')) return 3;
+            if (name.contains('桂圆')) return 4;
+            return 5;
+          }
+
+          String pickTeaImage(String rawName) => teaImages[pickTeaNo(rawName)]!;
           drinks = List.generate(generated.length, (index) {
             final item = generated[index];
+            final name = (item['name'] ?? '智能饮品').toString();
             return (
-              item['name'] ?? '智能饮品',
-              item['description'] ?? '结合体质与周期推荐',
-              item['price'] ?? '12',
-              imagePool[index % imagePool.length],
-              detailImagePool[index % detailImagePool.length],
+              name,
+              (item['description'] ?? '结合体质与周期推荐').toString(),
+              (item['price'] ?? '￥12').toString(),
+              pickTeaImage(name),
+              // 详情图同一套 tea1~tea5 资源
+              pickTeaImage(name),
             );
           });
         }
@@ -182,7 +192,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
             runSpacing: 8,
             children: [
               _tag(_insights?.latestReport?.constitution ?? '宫寒', true),
-              _tag(_insights?.latestReport?.pattern ?? '阴虚火旺', false),
+              _tag('阴虚火旺', false),
               _tag('气血两虚', false),
               _tag('气郁体质', false),
               _tag('湿热体质', false),
@@ -287,7 +297,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '¥${drink.$3}',
+                    drink.$3,
                     style: const TextStyle(
                       fontSize: 22,
                       color: Color(0xFFF54888),
@@ -355,7 +365,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
               child: Row(
                 children: [
                   Text(
-                    '¥${drink.$3}',
+                    drink.$3,
                     style: const TextStyle(
                       fontSize: 20,
                       color: Color(0xFFF54888),
@@ -533,7 +543,7 @@ class _DrinkRecommendScreenState extends State<DrinkRecommendScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '¥${drink.$3}',
+                                    drink.$3,
                                     style: const TextStyle(
                                       fontSize: 48 / 2,
                                       color: Color(0xFFF54888),

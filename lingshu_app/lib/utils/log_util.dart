@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:path/path.dart' as path;
 
@@ -69,17 +68,7 @@ class Log {
   }
 
   static void _printWithSplitting(String message) {
-    const int chunkSize = 1048;
-    if (message.length <= chunkSize) {
-      _logger.d(message);
-      return;
-    }
-
-    for (int i = 0; i < message.length; i += chunkSize) {
-      final end = (i + chunkSize < message.length) ? i + chunkSize : message.length;
-      final chunk = message.substring(i, end);
-      _logger.d(chunk);
-    }
+    _logger.d(message);
   }
 
   static String _getCallerLocation() {

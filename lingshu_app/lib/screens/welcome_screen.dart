@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
 
 import 'main_screen.dart';
@@ -18,6 +17,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   static const _videoAsset = 'assets/video/welcome_intro.mp4';
   static const _fallbackImageAsset =
       'assets/images/home_welcome_character_v2.png';
+
+  static const _backgroundImageAsset = 'assets/images/home_welcome_bg.png';
+  static const _titleImageAsset = 'assets/images/welcome_title.png';
+  static const _subtitleImageAsset = 'assets/images/welcome_subtitle.png';
 
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
@@ -129,17 +132,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final textColor = const Color(0xFF8B7D6B);
-
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0x99FFFBEB), Color(0x99FEFCF7)],
+          image: DecorationImage(
+            image: AssetImage(_backgroundImageAsset),
+            fit: BoxFit.cover,
           ),
         ),
         child: SafeArea(
@@ -148,13 +148,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               final screenW = constraints.maxWidth;
               final screenH = constraints.maxHeight;
 
-              final titleTop = screenH * 0.10;
-              final titleSize = (screenW * 0.145).clamp(52.0, 64.0);
-              final subtitleTopGap = screenH * 0.022;
-              final subtitleSize = (screenW * 0.055).clamp(20.0, 24.0);
+              final titleTop = (screenH * 0.015).clamp(8.0, 16.0);
+              final titleWidth = (screenW * 0.88).clamp(300.0, 390.0);
+              final subtitleTopGap = (screenH * 0.01).clamp(6.0, 14.0);
+              final subtitleWidth = (screenW * 0.72).clamp(255.0, 320.0);
 
               final circleSize = (screenW * 0.79).clamp(280.0, 352.0);
-              final circleTopGap = (screenH * 0.13).clamp(84.0, 138.0);
+              final circleTopGap = (screenH * 0.09).clamp(56.0, 92.0);
               final bottomSafeGap = (screenH * 0.06).clamp(34.0, 62.0);
 
               return FadeTransition(
@@ -174,31 +174,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               child: child,
                             );
                           },
-                          child: Text(
-                            '灵枢·AI',
-                            style: GoogleFonts.notoSerifSc(
-                              fontSize: titleSize,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: titleSize * 0.06,
-                              color: textColor,
-                              height: 1.12,
-                            ),
+                          child: Image.asset(
+                            _titleImageAsset,
+                            width: titleWidth,
+                            fit: BoxFit.contain,
                           ),
                         ),
                         SizedBox(height: subtitleTopGap),
                         FadeTransition(
                           opacity: _subtitleFadeAnimation,
-                          child: Text(
-                            '融古医之慧\n做你的 24 小时健康智囊',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.displayMedium
-                                ?.copyWith(
-                                  fontSize: subtitleSize,
-                                  fontWeight: FontWeight.w500,
-                                  height: 1.42,
-                                  letterSpacing: 0.7,
-                                  color: textColor,
-                                ),
+                          child: Image.asset(
+                            _subtitleImageAsset,
+                            width: subtitleWidth,
+                            fit: BoxFit.contain,
                           ),
                         ),
                         SizedBox(height: circleTopGap),
@@ -227,37 +215,37 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                 color: Color(0xFFF4F1E8),
                                 child: _videoReady && _videoController != null
                                     ? SizedBox.expand(
-                                        child: ClipRect(
-                                          child: Transform.scale(
-                                            // 源视频是横向并带黑边，放大后做中心裁切以保证圆内全画面
-                                            scale: 2.7,
-                                            child: Transform.translate(
-                                              offset: const Offset(0, 18),
-                                              child: FittedBox(
-                                                fit: BoxFit.cover,
-                                                clipBehavior: Clip.hardEdge,
-                                                child: SizedBox(
-                                                  width: _videoController!
-                                                      .value
-                                                      .size
-                                                      .width,
-                                                  height: _videoController!
-                                                      .value
-                                                      .size
-                                                      .height,
-                                                  child: VideoPlayer(
-                                                    _videoController!,
-                                                  ),
-                                                ),
-                                              ),
+                                  child: ClipRect(
+                                    child: Transform.scale(
+                                      // 源视频是横向并带黑边，放大后做中心裁切以保证圆内全画面
+                                      scale: 2.7,
+                                      child: Transform.translate(
+                                        offset: const Offset(0, 18),
+                                        child: FittedBox(
+                                          fit: BoxFit.cover,
+                                          clipBehavior: Clip.hardEdge,
+                                          child: SizedBox(
+                                            width: _videoController!
+                                                .value
+                                                .size
+                                                .width,
+                                            height: _videoController!
+                                                .value
+                                                .size
+                                                .height,
+                                            child: VideoPlayer(
+                                              _videoController!,
                                             ),
                                           ),
                                         ),
-                                      )
-                                    : Image.asset(
-                                        _fallbackImageAsset,
-                                        fit: BoxFit.cover,
                                       ),
+                                    ),
+                                  ),
+                                )
+                                    : Image.asset(
+                                  _fallbackImageAsset,
+                                  fit: BoxFit.cover,
+                                ),
                               ),
                             ),
                           ),

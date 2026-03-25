@@ -84,7 +84,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           const SizedBox(height: 20),
                           _buildAnalysisCompleteCard(),
                           const SizedBox(height: 24),
-                          Image.asset('assets/images/report_detail_type${widget.report.constitution == '平和质' ? 1 : 2}.png'),
+                          Image.asset('assets/images/report_detail_type${widget.report.constitution == '平和质' ? '1.png' : widget.report.constitution == '气虚质' ? '2.png' : widget.report.constitution == '湿热质' ? '3.jpg' : '4.jpg'}'),
                           const SizedBox(height: 24),
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 24.w ,vertical: 24.h),

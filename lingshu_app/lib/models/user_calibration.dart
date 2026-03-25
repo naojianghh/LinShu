@@ -266,7 +266,7 @@ class ActionAnalyzer {
         pose.landmarks[PoseLandmarkType.rightShoulder] ?? PoseLandmark(x: 0, y: 0, z: 0, type: PoseLandmarkType.rightShoulder, likelihood: 0),
       );
     } catch (e) {
-      print('计算角度时出错: $e');
+      Log.d('计算角度时出错: $e');
     }
     
     return angles;

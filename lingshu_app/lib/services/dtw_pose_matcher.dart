@@ -118,11 +118,27 @@ class DtwPoseMatcher {
   final int minRecordFrames = 15;
   final int maxRecordFrames = 220;
 
+  // ---------------------------
+  // 动作特定“手腕门阀”（基于 *_kp6.json 里手腕 relYUp 分布统计）
+  // 说明：relYUp 为“相对鼻子”的 y-up，很多动作的抬手仍可能是负值，
+  // 因此不能统一使用 0.05。
+  // ---------------------------
+  final double _startWristRelYUpStep1 = 0.02;
+  final double _passWristRelYUpStep1 = 0.03;
+
+  // 左右开弓：抬起手表现为“更不负”，用负阈值。
+  final double _startWristRelYUpStep2 = -0.63;
+  final double _passWristRelYUpStep2 = -0.34;
+
+  // 调理脾胃：抬起手分布跨过 0，小幅抬起即可开始，pass 再略提高。
+  final double _startWristRelYUpStep3 = 0.00;
+  final double _passWristRelYUpStep3 = 0.02;
+
   // 通过阈值：当前日志中相似度通常只有 6~16（取决于 avgCost 量级）
   // 为了让“能触发通过”先跑通流程，先把阈值下调到 8 左右，后续可基于新日志继续微调。
   // 轨迹检测：不让肘角前两维参与 DTW 距离，并且通过判定不再使用肘角。
   // 实际上你的在线日志里 sim 常落在 40~60；这里先给一个能触发流程的起始阈值。
-  final double passSimilarityThreshold = 55.0;
+  final double passSimilarityThreshold = 50.0;
 
   // 通过时要求手腕相对鼻子的高度足够高（用位置，不用角度）。
   final double passWristRelYUpMin = 0.05;
@@ -337,7 +353,7 @@ class DtwPoseMatcher {
 
     final avgCost = dist / (resized.length + _templateStd.length);
     // 更平滑的相似度映射：避免 exp 在 avgCost 稍大时下溢到 1e-100 级别
-    final similarity = 100.0 / (1.0 + avgCost / 40.0);
+    final similarity = 100.0 / (1.0 + avgCost / 50.0);
     lastSimilarity = similarity.isFinite ? similarity.clamp(0.0, 100.0) : 0.0;
 
     // ===== 调试日志（只在真正评估DTW时打印）=====
@@ -638,6 +654,10 @@ class DtwPoseMatcher {
   /// 起势时肘部相对肩的“抬高”辅助条件（y-up 越大越靠上），按动作选用单侧或跳过。
   bool _isStartElbowAuxOk(double leftElbowRelYUp, double rightElbowRelYUp) {
     switch (_actionType) {
+      case '左右开弓-左':
+        return leftElbowRelYUp > startElbowRelYUp;
+      case '左右开弓-右':
+        return rightElbowRelYUp > startElbowRelYUp;
       case '调理脾胃-左':
         return leftElbowRelYUp > startElbowRelYUp;
       case '调理脾胃-右':
@@ -652,31 +672,46 @@ class DtwPoseMatcher {
 
   bool _isStartWristPoseOk(double leftWristRelYUp, double rightWristRelYUp) {
     switch (_actionType) {
+      case '双手托天':
+        return leftWristRelYUp >= _startWristRelYUpStep1 &&
+            rightWristRelYUp >= _startWristRelYUpStep1;
+      case '左右开弓-左':
+        return leftWristRelYUp >= _startWristRelYUpStep2;
+      case '左右开弓-右':
+        return rightWristRelYUp >= _startWristRelYUpStep2;
       case '调理脾胃-左':
-        return leftWristRelYUp >= startWristRelYUp;
+        return leftWristRelYUp >= _startWristRelYUpStep3;
       case '调理脾胃-右':
-        return rightWristRelYUp >= startWristRelYUp;
+        return rightWristRelYUp >= _startWristRelYUpStep3;
       case '摇头摆尾-左':
       case '摇头摆尾-右':
-        return leftWristRelYUp >= startWristRelYUpLow || rightWristRelYUp >= startWristRelYUpLow;
+        return true;
       default:
-        return leftWristRelYUp >= startWristRelYUp && rightWristRelYUp >= startWristRelYUp;
+        return leftWristRelYUp >= _startWristRelYUpStep1 &&
+            rightWristRelYUp >= _startWristRelYUpStep1;
     }
   }
 
   bool _isPassWristPoseOk(double leftWristRelYUp, double rightWristRelYUp) {
-    // switch (_actionType) {
-    //   case '调理脾胃-左':
-    //     return leftWristRelYUp >= passWristRelYUpMin;
-    //   case '调理脾胃-右':
-    //     return rightWristRelYUp >= passWristRelYUpMin;
-    //   case '摇头摆尾-左':
-    //   case '摇头摆尾-右':
-    //     return true;
-    //   default:
-    //     return leftWristRelYUp >= passWristRelYUpMin && rightWristRelYUp >= passWristRelYUpMin;
-    // }
-    return true;
+    switch (_actionType) {
+      case '双手托天':
+        return leftWristRelYUp >= _passWristRelYUpStep1 &&
+            rightWristRelYUp >= _passWristRelYUpStep1;
+      case '左右开弓-左':
+        return leftWristRelYUp >= _passWristRelYUpStep2;
+      case '左右开弓-右':
+        return rightWristRelYUp >= _passWristRelYUpStep2;
+      case '调理脾胃-左':
+        return rightWristRelYUp >= _passWristRelYUpStep3;
+      case '调理脾胃-右':
+        return leftWristRelYUp >= _passWristRelYUpStep3;
+      case '摇头摆尾-左':
+      case '摇头摆尾-右':
+        return true;
+      default:
+        return leftWristRelYUp >= passWristRelYUpMin &&
+            rightWristRelYUp >= passWristRelYUpMin;
+    }
   }
 
   (double, double)? _wristRelYUpFromPose(Pose pose) {
