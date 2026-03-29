@@ -54,4 +54,11 @@ class SportSequenceManager {
       return false;
     }
   }
+
+  /// 直接跳转到指定步骤（0-based），用于用户手动切换「第N式」等场景。
+  void setStepIndex(int index) {
+    if (index < 0 || index >= _actionSteps.length) return;
+    _currentStepIndex = index;
+    _isSequenceCompleted = false;
+  }
 }

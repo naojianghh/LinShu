@@ -100,7 +100,7 @@ class MeditationMainScreen extends StatefulWidget {
 }
 
 class _MeditationMainScreenState extends State<MeditationMainScreen> {
-  final FiveToneService _fiveToneService = FiveToneService();
+  //final FiveToneService _fiveToneService = FiveToneService();
   final UserHealthBridgeService _bridgeService =
       UserHealthBridgeService.instance;
 
@@ -510,6 +510,33 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
     );
   }
 
+  List<FiveToneTrack> getTracks(String tone) {
+    switch (tone) {
+      case '宫音':
+        return [FiveToneTrack(tone: tone, title: '青花瓷', artist: '周杰伦', path: 'music/qing_hua_chi.mp3'),
+        FiveToneTrack(tone: tone, title: '春江花月夜', artist: '童丽', path: 'music/chun_jiang_hua_yue_ye.mp3'),
+        FiveToneTrack(tone: tone, title: '大鱼', artist: '周深', path: 'music/da_yu.mp3')];
+      case '商音':
+        return [FiveToneTrack(tone: tone, title: '阳春白雪', artist: '传奇乐坊', path: 'music/yan_chun_bai_xue.mp3'),
+        FiveToneTrack(tone: tone, title: '秋日私语', artist: 'Richard Clayderman', path: 'music/qiu_ri_si_yu.mp3')];
+      case '角音':
+        return [FiveToneTrack(tone: tone, title: '稻香', artist: '周杰伦', path: 'music/dao_xiang.mp3'),
+        FiveToneTrack(tone: tone, title: '纯音乐 - 江南丝竹', artist: '丝奇雨文', path: 'music/jiang_nan_si_zhu.mp3'),
+        FiveToneTrack(tone: tone, title: '小幸运', artist: '田馥甄', path: 'music/xiao_xin_yun.mp3')];
+      case '徵音':
+        return [FiveToneTrack(tone: tone, title: '兰亭序', artist: '周深', path: 'music/lan_ting_xu.mp3'),
+        FiveToneTrack(tone: tone, title: '不染', artist: '毛不易', path: 'music/bu_ran.mp3'),
+        FiveToneTrack(tone: tone, title: '梁祝', artist: '古筝演奏', path: 'music/liang_zhu.mp3')];
+      case '羽音':
+        return[FiveToneTrack(tone: tone, title: '梅花三弄', artist: '古筝独奏', path: 'music/mei_hua_san_nong.mp3'),
+        FiveToneTrack(tone: tone, title: '菊花台', artist: '周杰伦', path: 'music/ju_hua_tai.mp3'),
+        FiveToneTrack(tone: tone, title: '观山', artist: '杨青', path: 'music/guan_san.mp3'),
+        FiveToneTrack(tone: tone, title: '海屿你', artist: '马也', path: 'music/hai_yu_nu.mp3')];
+      default:
+        return [FiveToneTrack(tone: '宫音', title: '青花瓷', artist: '周杰伦', path: 'music/qing_hua_chi.mp3')];
+    }
+  }
+
   Future<void> _openToneMusic(String name, String desc) async {
     showDialog<void>(
       context: context,
@@ -518,7 +545,7 @@ class _MeditationMainScreenState extends State<MeditationMainScreen> {
     );
 
     try {
-      final tracks = await _fiveToneService.fetchTracksByTone(name);
+      List<FiveToneTrack> tracks = getTracks(name);
       if (!mounted) {
         return;
       }

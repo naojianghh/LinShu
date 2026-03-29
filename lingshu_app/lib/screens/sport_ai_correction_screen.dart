@@ -5,12 +5,13 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:video_player/video_player.dart';
 
 import '../models/user_calibration.dart';
 import '../services/dtw_pose_matcher.dart';
 import '../services/pose_analyse.dart';
 import '../utils/log_util.dart';
-import '../utils/pose_landmark_painter.dart';
+//import '../utils/pose_landmark_painter.dart';
 
 class SportAiCorrectionScreen extends StatefulWidget {
   final String sportType;
@@ -28,8 +29,9 @@ class SportAiCorrectionScreen extends StatefulWidget {
 
 class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
   late PoseDetector _poseDetector;
-
-  bool _isShowDialog = false;
+  late VideoPlayerController _demoVideoController;
+  bool _isDemoVideoReady = false;
+  String? _demoVideoError;
 
   Pose? _currentPose;
   double _poseAccuracy = 0.0;
@@ -55,6 +57,9 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
   int _streamSessionId = 0; // 每次开始一段流会话就递增
   bool _isPoseStreamRunning = false;
   bool _isProcessingFrame = false;
+
+  /// 演示视频异步加载序号，避免快速切换「第N式」时旧请求覆盖新状态。
+  int _demoVideoLoadGeneration = 0;
 
   // DTW（第1式 + 第2式左/右）比对
   late final DtwPoseMatcher _dtwMatcherStep1;
@@ -97,6 +102,7 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     super.initState();
 
     _initializeCalibrationSystem();
+    unawaited(_reloadDemoVideoForCurrentGuideTab());
     _initDetector();
 
     _dtwMatcherStep1 = DtwPoseMatcher();
@@ -832,9 +838,9 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
         _currentSuggestion = '通过！相似度: ${dtwResult.similarity.toStringAsFixed(0)}%';
 
         if (dtwResult.passed) {
-          Future.delayed(const Duration(seconds: 1), () {
-            _nextActionStep();
-          });
+          // 不自动进入下一步：由用户在下方「第N式」标签手动切换
+          _currentSuggestion =
+              '本式已通过！请手动切换下方「第1式」～「第4式」标签继续练习。';
         }
       } else {
         _currentSuggestion = '匹配中... 相似度: ${sim.toStringAsFixed(0)}%';
@@ -927,11 +933,7 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     // Log.d('当前动作: ${_sportSequenceManager.currentStep.name} (${_sportSequenceManager.currentStepIndex}/${_sportSequenceManager.totalSteps})', tag: 'analyzePose');
   }
 
-  // 进入下一步动作
-  void _nextActionStep() {
-    if (!mounted) return;
-
-    // 切 step 前清空 DTW 在线状态，避免串动作缓存污染
+  void _resetDtwMatchers() {
     _dtwMatcherStep1.resetRecording();
     _dtwMatcherStep2Left.resetRecording();
     _dtwMatcherStep2Right.resetRecording();
@@ -939,51 +941,96 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     _dtwMatcherStep3Right.resetRecording();
     _dtwMatcherStep4Left.resetRecording();
     _dtwMatcherStep4Right.resetRecording();
+  }
 
-    final hasNextStep = _sportSequenceManager.nextStep();
-    
-    if (hasNextStep) {
+  /// 与 UI「第1式～第4式」标签对应的序列下标（八段锦纠错页为 4 式演示，每式取左式作为当前识别步骤）。
+  int _baduanjinGuideTabToSequenceIndex(int tabIndex) {
+    const mapping = <int, int>{
+      0: 0, // 两手托天理三焦 -> 双手托天
+      1: 5, // 左右开弓似射雕 -> 左右开弓-左
+      2: 1, // 调理脾胃须单举 -> 调理脾胃-左
+      3: 3, // 与模板中「摇头摆尾」对应（演示为单式左）
+    };
+    return mapping[tabIndex] ?? 0;
+  }
+
+  void _onGuideTabSelected(int index) {
+    if (widget.sportType == '八段锦') {
+      _resetDtwMatchers();
+      _sportSequenceManager.setStepIndex(_baduanjinGuideTabToSequenceIndex(index));
       setState(() {
+        _selectedGuideTab = index;
         _isActionCompleted = false;
+        _poseAccuracy = 0;
         _currentSuggestion = '请开始 ${_sportSequenceManager.currentStep.name}';
       });
-      Log.d('进入下一步: ${_sportSequenceManager.currentStep.name}', tag: 'Sequence');
+      unawaited(_reloadDemoVideoForCurrentGuideTab());
     } else {
-      setState(() {
-        _isSequenceCompleted = true;
-        _currentSuggestion = '恭喜！运动序列已完成！';
-      });
-      Log.d('运动序列完成', tag: 'Sequence');
-      if(!_isShowDialog) {
-        _showCompletionDialog();
-      }
+      setState(() => _selectedGuideTab = index);
     }
   }
 
-  // 显示完成对话框
-  void _showCompletionDialog() {
-    _isShowDialog = true;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('运动完成'),
-        content: Text(
-          '恭喜您完成了${widget.sportType}的所有动作！\n\n' 
-          '完成动作数: ${_sportSequenceManager.totalSteps}\n' 
-          '坚持练习，有益健康！',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // 关闭对话框
-              Navigator.of(context).pop(); // 弹出当前纠错页
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
+  List<String> _demoVideoCandidatePaths() {
+    if (widget.sportType == '太极拳') {
+      return const [
+        'assets/video/taiji_safe.mp4',
+        'assets/video/taiji_480p.mp4',
+        'assets/video/taiji.mp4',
+      ];
+    }
+    if (widget.sportType == '八段锦') {
+      return [
+        'assets/video/baduanjin_sport_1.mp4',
+        'assets/video/baduanjin_sport_2_all.mp4',
+        'assets/video/baduanjin_sport_3_all.mp4',
+        'aassets/video/baduanjin_sport_4_all.mp4',
+      ];
+    }
+    return const ['assets/video/baduanjin_sport_2_all.mp4'];
+  }
+
+  Future<void> _reloadDemoVideoForCurrentGuideTab() async {
+    final gen = ++_demoVideoLoadGeneration;
+    final candidates = _demoVideoCandidatePaths();
+    Object? lastError;
+
+    final targetAsset = candidates[_selectedGuideTab];
+
+    if (!mounted || gen != _demoVideoLoadGeneration) return;
+    try {
+      final controller = VideoPlayerController.asset(targetAsset);
+      await controller.initialize();
+      if (!mounted || gen != _demoVideoLoadGeneration) {
+        await controller.dispose();
+        return;
+      }
+      controller.setLooping(true);
+
+      if (_isDemoVideoReady) {
+        _demoVideoController.dispose();
+      }
+      _demoVideoController = controller;
+      setState(() {
+        _isDemoVideoReady = true;
+        _demoVideoError = null;
+      });
+      Log.d('演示视频加载成功: $targetAsset', tag: 'DemoVideo');
+      return;
+    } catch (e) {
+      lastError = e;
+      Log.e('演示视频加载失败($targetAsset): $e', tag: 'DemoVideo');
+    }
+
+    if (!mounted || gen != _demoVideoLoadGeneration) return;
+    setState(() {
+      if (_isDemoVideoReady) {
+        _demoVideoError = '切换分式演示视频失败，已沿用上一段';
+      } else {
+        _isDemoVideoReady = false;
+        _demoVideoError = '视频加载失败，请检查 assets/video 下对应 mp4';
+      }
+    });
+    Log.e('演示视频全部候选加载失败: $lastError', tag: 'DemoVideo');
   }
 
   @override
@@ -992,369 +1039,677 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     _streamSessionId++; // 使得任何挂起的延迟/回调全部失效
     _isProcessingFrame = false;
     _isPoseStreamRunning = false;
+    if (_isDemoVideoReady) {
+      _demoVideoController.dispose();
+    }
 
     _stopCameraImageStream();
     _poseDetector.close(); // 释放 MLKit 资源
     super.dispose();
   }
 
+  // @override
+  // Widget build(BuildContext context) {
+  //   // 获取当前动作步骤
+  //   final currentStep = _sportSequenceManager.currentStep;
+  //   final stepProgress = _sportSequenceManager.currentStepIndex / _sportSequenceManager.totalSteps;
+  //
+  //   String actionName = currentStep.name;
+  //   List<String> checkItems = currentStep.checkItems;
+  //   String suggestion = _currentSuggestion.isNotEmpty ? _currentSuggestion : '请站到画面中央，准备开始 ${currentStep.name}';
+  //
+  //   return Scaffold(
+  //     backgroundColor: const Color(0xFFFDFCF7),
+  //     body: SafeArea(child: Stack(
+  //       children: [
+  //         // 相机背景
+  //         if (widget.cameraController != null && widget.cameraController!.value.isInitialized)
+  //           Positioned.fill(
+  //             child: ClipRRect(
+  //               child: SizedBox(
+  //                 width: double.infinity,
+  //                 height: double.infinity,
+  //                 child: FittedBox(
+  //                   fit: BoxFit.cover,
+  //                   child: SizedBox(
+  //                     width: widget.cameraController!.value.previewSize!.height,
+  //                     height: widget.cameraController!.value.previewSize!.width,
+  //                     child: Stack(
+  //                       children: [
+  //                         CameraPreview(widget.cameraController!),
+  //                         if (_currentPose != null)
+  //                           Positioned.fill(
+  //                             child: CustomPaint(
+  //                               painter: PoseLandmarkPainter(
+  //                                 pose: _currentPose,
+  //                                 previewSize: widget.cameraController!.value.previewSize!,
+  //                                 cameraLensDirection: widget.cameraController!.description.lensDirection,
+  //                               ),
+  //                             ),
+  //                           ),
+  //                       ],
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ),
+  //             ),
+  //           )
+  //         else
+  //           Positioned.fill(child: Container(color: Colors.black)),
+  //
+  //         // 校准状态覆盖层
+  //         if (_isCalibrating)
+  //           Positioned.fill(
+  //             child: Container(
+  //               color: Colors.black.withValues(alpha: 0.7),
+  //               child: Column(
+  //                 mainAxisAlignment: MainAxisAlignment.center,
+  //                 children: [
+  //                   const CircularProgressIndicator(color: Colors.white),
+  //                   const SizedBox(height: 30),
+  //                   Text(
+  //                     _calibrationMessage,
+  //                     style: const TextStyle(
+  //                       color: Colors.white,
+  //                       fontSize: 18,
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                     textAlign: TextAlign.center,
+  //                   ),
+  //                   const SizedBox(height: 20),
+  //                   const Text(
+  //                     '请保持姿势稳定...',
+  //                     style: TextStyle(
+  //                       color: Colors.white70,
+  //                       fontSize: 14,
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ),
+  //
+  //         // 校准失败提示
+  //         if (!_isCalibrating && !_isCalibrated && _calibrationMessage.isNotEmpty)
+  //           Positioned.fill(
+  //             child: Container(
+  //               color: Colors.black.withValues(alpha: 0.7),
+  //               child: Column(
+  //                 mainAxisAlignment: MainAxisAlignment.center,
+  //                 children: [
+  //                   const Icon(
+  //                     Icons.error_outline,
+  //                     color: Colors.red,
+  //                     size: 60,
+  //                   ),
+  //                   const SizedBox(height: 20),
+  //                   Text(
+  //                     _calibrationMessage,
+  //                     style: const TextStyle(
+  //                       color: Colors.white,
+  //                       fontSize: 18,
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                     textAlign: TextAlign.center,
+  //                   ),
+  //                   const SizedBox(height: 30),
+  //                   ElevatedButton(
+  //                     onPressed: _startCalibration,
+  //                     style: ElevatedButton.styleFrom(
+  //                       backgroundColor: const Color(0xFF3C9566),
+  //                       foregroundColor: Colors.white,
+  //                       padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+  //                       shape: RoundedRectangleBorder(
+  //                         borderRadius: BorderRadius.circular(10),
+  //                       ),
+  //                     ),
+  //                     child: const Text('重新校准'),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ),
+  //
+  //         // UI 层
+  //         if (_isCalibrated)
+  //           Column(
+  //             children: [
+  //               _buildTopInfo(context, actionName, stepProgress),
+  //               const Spacer(),
+  //               GestureDetector(
+  //                 onTap: () => _showBottomSheet(context, actionName, checkItems, suggestion),
+  //                 child: Container(
+  //                   margin: const EdgeInsets.all(20),
+  //                   padding: const EdgeInsets.all(20),
+  //                   decoration: BoxDecoration(
+  //                     color: Colors.white.withValues(alpha: 0.6),
+  //                     borderRadius: BorderRadius.circular(24),
+  //                   ),
+  //                   child: Column(
+  //                     mainAxisSize: MainAxisSize.min,
+  //                     children: [
+  //                       Container(
+  //                         width: 40,
+  //                         height: 4,
+  //                         decoration: BoxDecoration(
+  //                           color: Colors.grey[300],
+  //                           borderRadius: BorderRadius.circular(2),
+  //                         ),
+  //                       ),
+  //                       const SizedBox(height: 16),
+  //                       Row(
+  //                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                         children: [
+  //                           const Text(
+  //                             '姿态准确度',
+  //                             style: TextStyle(
+  //                               fontSize: 16,
+  //                               fontWeight: FontWeight.bold,
+  //                               color: Color(0xFF1E2939),
+  //                             ),
+  //                           ),
+  //                           Text(
+  //                             '${_poseAccuracy.toStringAsFixed(0)}%',
+  //                             style: TextStyle(
+  //                               fontSize: 24,
+  //                               fontWeight: FontWeight.bold,
+  //                               color: _isActionCompleted ? const Color(0xFF3C9566) : const Color(0xFFF59E0B),
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                       const SizedBox(height: 8),
+  //                       Text(
+  //                         suggestion,
+  //                         style: const TextStyle(
+  //                           fontSize: 12,
+  //                           color: Colors.grey,
+  //                         ),
+  //                         textAlign: TextAlign.center,
+  //                       ),
+  //                     ],
+  //                   ),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //       ],
+  //     )),
+  //   );
+  // }
+
+  int _selectedGuideTab = 0;
+
   @override
   Widget build(BuildContext context) {
-    // 获取当前动作步骤
-    final currentStep = _sportSequenceManager.currentStep;
-    final stepProgress = _sportSequenceManager.currentStepIndex / _sportSequenceManager.totalSteps;
-    
-    String actionName = currentStep.name;
-    List<String> checkItems = currentStep.checkItems;
-    String suggestion = _currentSuggestion.isNotEmpty ? _currentSuggestion : '请站到画面中央，准备开始 ${currentStep.name}';
+    String actionName = '双手托天理三焦';
+    List<String> checkItems = ['手臂伸直', '目视手背', '腰背挺直'];
+    String suggestion = _currentSuggestion.isNotEmpty
+        ? _currentSuggestion
+        : '注意保持腰背挺直，手臂伸展更充分';
+
+    if (widget.sportType == '八段锦') {
+      final baduanjinConfigs = _buildCorrectionBaduanjinActionConfigs();
+      final currentIndex = _selectedGuideTab.clamp(
+        0,
+        baduanjinConfigs.length - 1,
+      );
+      final currentAction = baduanjinConfigs[currentIndex];
+      actionName = currentAction['title'] as String;
+      checkItems = currentAction['guides'] as List<String>;
+    } else if (widget.sportType == '瑜伽') {
+      actionName = '猫牛式伸展';
+      checkItems = ['脊柱律动', '呼吸同步', '四肢支撑'];
+      suggestion = _currentSuggestion.isNotEmpty
+          ? _currentSuggestion
+          : '保持呼吸平稳，脊柱自然延展';
+    } else if (widget.sportType == '太极拳') {
+      actionName = '左右野马分鬃';
+      checkItems = ['虚实分明', '转腰带动', '气沉丹田'];
+      suggestion = _currentSuggestion.isNotEmpty
+          ? _currentSuggestion
+          : '注意重心转换，保持身体稳定';
+    }
+
+    const progress = 0.13;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFDFCF7),
-      body: SafeArea(child: Stack(
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildCorrectionAppBar(context),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionHeader('智能运动纠错', 'AI实时姿态识别与纠正'),
+                    const SizedBox(height: 20),
+                    if (_isCalibrated) ...[
+                      _buildProgressCard(actionName, progress),
+                      const SizedBox(height: 24),
+                      _buildDemoVideoSection(),
+                      const SizedBox(height: 24),
+                    ],
+                    _buildAiPreviewCard(),
+                    const SizedBox(height: 16),
+                    if (_isCalibrated) ...[
+                      _buildAccuracyCard(suggestion),
+                      const SizedBox(height: 16),
+                      _buildEndPracticeButton(context),
+                      const SizedBox(height: 16),
+                      _buildGuideCard(actionName, checkItems),
+                      const SizedBox(height: 40),
+                    ] else
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: Text(
+                          _isCalibrating
+                              ? '请面向上方相机框完成姿态校准。'
+                              : '校准未完成：请查看相机框内提示，或点击「重新校准」。',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B5D4F),
+                            fontFamily: 'STKaiti',
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 仅覆盖相机预览区域：校准进行中
+  Widget _buildCalibratingOverlayInCamera() {
+    return Container(
+      color: Colors.black.withValues(alpha: 0.72),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 相机背景
-          if (widget.cameraController != null && widget.cameraController!.value.isInitialized)
-            Positioned.fill(
-              child: ClipRRect(
-                child: SizedBox(
-                  width: double.infinity,
-                  height: double.infinity,
+          const SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.2,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _calibrationMessage,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.25,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '请保持姿势稳定',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 仅覆盖相机预览区域：校准失败 + 重新校准
+  Widget _buildCalibrationFailedOverlayInCamera() {
+    return Container(
+      color: Colors.black.withValues(alpha: 0.75),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.error_outline,
+            color: Colors.redAccent,
+            size: 36,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _calibrationMessage,
+            maxLines: 5,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.25,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 34,
+            child: ElevatedButton(
+              onPressed: _startCalibration,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3C9566),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                textStyle: const TextStyle(fontSize: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('重新校准'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressCard(String actionName, double progress) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFEFB), Color(0xFFFDFCF7)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE8DCC8)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3C9566).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  actionName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: Color(0xFF1E2939),
+                    fontFamily: 'STKaiti',
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color.fromRGBO(239, 246, 255, 0.8),
+                      Color.fromRGBO(219, 234, 254, 0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFA4C4E8)),
+                ),
+                child: const Text(
+                  '1/8',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF1E40AF),
+                    fontFamily: 'STKaiti',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${(progress * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B5D4F),
+                fontFamily: 'STKaiti',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 10,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F3ED),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: const Color(0xFFE8DCC8)),
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: progress,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFD4B896), Color(0xFFC9AA7D)],
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiPreviewCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFEFB), Color(0xFFFDFCF7)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE8DCC8)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3C9566).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          height: 188,
+          width: double.infinity,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(color: const Color(0xFF101828)),
+              if (widget.cameraController != null &&
+                  widget.cameraController!.value.isInitialized)
+                Positioned.fill(
                   child: FittedBox(
                     fit: BoxFit.cover,
                     child: SizedBox(
                       width: widget.cameraController!.value.previewSize!.height,
                       height: widget.cameraController!.value.previewSize!.width,
-                      child: Stack(
-                        children: [
-                          CameraPreview(widget.cameraController!),
-                          if (_currentPose != null)
-                            Positioned.fill(
-                              child: CustomPaint(
-                                painter: PoseLandmarkPainter(
-                                  pose: _currentPose,
-                                  previewSize: widget.cameraController!.value.previewSize!,
-                                  cameraLensDirection: widget.cameraController!.description.lensDirection,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                      child: CameraPreview(widget.cameraController!),
                     ),
                   ),
                 ),
+              Positioned.fill(
+                child: Container(
+                  color: const Color(0xFF0A1A3A).withValues(alpha: 0.45),
+                ),
               ),
-            )
-          else
-            Positioned.fill(child: Container(color: Colors.black)),
-          
-          // 校准状态覆盖层
-          if (_isCalibrating)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.7),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              SizedBox(
+                width: 96,
+                height: 192,
+                child: Stack(
                   children: [
-                    const CircularProgressIndicator(color: Colors.white),
-                    const SizedBox(height: 30),
-                    Text(
-                      _calibrationMessage,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      '请保持姿势稳定...',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          
-          // 校准失败提示
-          if (!_isCalibrating && !_isCalibrated && _calibrationMessage.isNotEmpty)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.7),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      color: Colors.red,
-                      size: 60,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      _calibrationMessage,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton(
-                      onPressed: _startCalibration,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3C9566),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text('重新校准'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          
-          // UI 层
-          if (_isCalibrated)
-            Column(
-              children: [
-                _buildTopInfo(context, actionName, stepProgress),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => _showBottomSheet(context, actionName, checkItems, suggestion),
-                  child: Container(
-                    margin: const EdgeInsets.all(20),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              '姿态准确度',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E2939),
-                              ),
-                            ),
-                            Text(
-                              '${_poseAccuracy.toStringAsFixed(0)}%',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: _isActionCompleted ? const Color(0xFF3C9566) : const Color(0xFFF59E0B),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          suggestion,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-        ],
-      )),
-    );
-  }
-
-  void _showBottomSheet(BuildContext context, String actionName, List<String> checkItems, String suggestion) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      isDismissible: true,
-      enableDrag: true,
-      barrierColor: Colors.black54,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => SafeArea(child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(32),
-              topRight: Radius.circular(32),
-            ),
-          ),
-          child: _buildCorrectionPanel(
-            context,
-            actionName,
-            checkItems,
-            _currentSuggestion,
-            _poseAccuracy,
-            _checkResults,
-          ),
-        )),
-      ),
-    );
-  }
-
-  Widget _buildTopInfo(BuildContext context, String actionName, double stepProgress) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                actionName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'STKaiti',
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Text(
-                    '${_sportSequenceManager.currentStepIndex}/${_sportSequenceManager.totalSteps}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 120,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    child: FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: stepProgress,
+                    Positioned(top: 0, left: 44, child: _pointDot()),
+                    Positioned(
+                      top: 32,
+                      left: 47,
                       child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3C9566),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                        width: 2,
+                        height: 96,
+                        color: const Color(0xFF22C55E),
                       ),
                     ),
-                  ),
-                ],
+                    Positioned(
+                      top: 64,
+                      left: 0,
+                      child: Container(
+                        width: 96,
+                        height: 2,
+                        color: const Color(0xFF22C55E),
+                      ),
+                    ),
+                    Positioned(top: 60, left: 0, child: _pointDot()),
+                    Positioned(top: 60, right: 0, child: _pointDot()),
+                    Positioned(top: 60, left: 44, child: _pointDot()),
+                    Positioned(bottom: 0, left: 32, child: _pointDot()),
+                    Positioned(bottom: 0, right: 32, child: _pointDot()),
+                  ],
+                ),
               ),
-            ],
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '${(_sportSequenceManager.currentStepIndex / _sportSequenceManager.totalSteps * 100).toStringAsFixed(0)}%',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+              const Icon(
+                Icons.photo_camera_outlined,
+                color: Colors.white70,
+                size: 52,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCorrectionPanel(
-      BuildContext context,
-      String actionName,
-      List<String> checkItems,
-      String currentSuggestion,
-      double poseAccuracy,
-      Map<String, bool> checkResults,
-      ) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(32),
-          topRight: Radius.circular(32),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Color(0xFF3C9566), size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    '姿态准确度',
+              if (_isCalibrated)
+                const Positioned(
+                  bottom: 34,
+                  child: Text(
+                    'AI正在识别姿态...',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E2939),
+                      color: Colors.white,
                       fontFamily: 'STKaiti',
                     ),
                   ),
-                ],
+                ),
+              if (_isCalibrating)
+                Positioned.fill(
+                  child: _buildCalibratingOverlayInCamera(),
+                ),
+              if (!_isCalibrating &&
+                  !_isCalibrated &&
+                  _calibrationMessage.isNotEmpty)
+                Positioned.fill(
+                  child: _buildCalibrationFailedOverlayInCamera(),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pointDot() {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: const BoxDecoration(
+        color: Color(0xFF22C55E),
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  Widget _buildAccuracyCard(String suggestion) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.fromRGBO(232, 245, 237, 0.4),
+            Color.fromRGBO(240, 250, 244, 0.4),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD4EAD9)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check, color: Color(0xFF3C9566), size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                '姿态准确度',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF1E2939),
+                  fontFamily: 'STKaiti',
+                ),
               ),
+              const Spacer(),
               Text(
-                '${poseAccuracy.toStringAsFixed(0)}%',
+                '${_poseAccuracy.toStringAsFixed(0)}%',
                 style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 36,
                   color: Color(0xFF3C9566),
+                  fontFamily: 'STKaiti',
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            value: (_poseAccuracy / 100).clamp(0, 1),
+            minHeight: 10,
+            backgroundColor: const Color(0xFFE8F5ED),
+            borderRadius: BorderRadius.circular(999),
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3C9566)),
+          ),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(16),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF9E6),
-              borderRadius: BorderRadius.circular(16),
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0xFFFDE68A)),
             ),
             child: Row(
               children: [
                 const Icon(
                   Icons.info_outline,
-                  color: Color(0xFFD97706),
-                  size: 20,
+                  color: Color(0xFFB45309),
+                  size: 16,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    currentSuggestion,
+                    suggestion,
                     style: const TextStyle(
-                      color: Color(0xFF92400E),
                       fontSize: 14,
+                      color: Color(0xFF92400E),
                       fontFamily: 'STKaiti',
                     ),
                   ),
@@ -1362,43 +1717,368 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEndPracticeButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 46,
+      child: OutlinedButton(
+        onPressed: () => Navigator.pop(context),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: const Color(0xFFFFFEFB),
+          side: const BorderSide(color: Color(0xFFE8DCC8)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: const Text(
+          '结束练习',
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF2D4A3E),
+            fontFamily: 'STKaiti',
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Map<String, Object>> _buildCorrectionBaduanjinActionConfigs() {
+    return [
+      {
+        'title': '两手托天理三焦',
+        'guides': ['两掌上托，手臂伸直', '掌心向上，目视手背', '腰背中正，呼吸均匀'],
+      },
+      {
+        'title': '左右开弓似射雕',
+        'guides': ['马步下沉，重心稳定', '一手推掌，一手拉弓', '目视前手指尖，沉肩坠肘'],
+      },
+      {
+        'title': '调理脾胃须单举',
+        'guides': ['一手上托，一手下按', '双掌上下对拉，力达指端', '脊柱中正，动作舒缓连贯'],
+      },
+      {
+        'title': '五劳七伤往后瞧',
+        'guides': ['头颈缓慢后转，幅度适中', '目随视线看后方', '双肩放松，躯干保持稳定'],
+      },
+    ];
+  }
+
+  Widget _buildGuideCard(String actionName, List<String> checkItems) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFEFB), Color(0xFFFDFCF7)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE8DCC8)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3C9566).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '动作要领',
+            style: TextStyle(
+              fontSize: 18,
+              color: Color(0xFF2D4A3E),
+              fontFamily: 'STKaiti',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 128,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFF3C9566),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFF5F3ED), Color(0xFFECEAE0)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE8DCC8)),
+            ),
+            child: Row(
+              children: List.generate(4, (index) {
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => _onGuideTabSelected(index),
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: _selectedGuideTab == index
+                            ? Colors.white
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: _selectedGuideTab == index
+                            ? Border.all(color: const Color(0xFFD4EAD9))
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '第${index + 1}式',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: _selectedGuideTab == index
+                                ? const Color(0xFF2D4A3E)
+                                : const Color(0xFF6B5D4F),
+                            fontFamily: 'STKaiti',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 16),
           Text(
             actionName,
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontSize: 16,
               color: Color(0xFF1E2939),
               fontFamily: 'STKaiti',
             ),
           ),
-          const SizedBox(height: 12),
-          ...checkItems.asMap().entries.map((entry) {
-            final isChecked = checkResults[entry.value] ?? false;
-            return _checkItem(entry.value, isChecked);
-          }),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: () {
-                // 返回到运动主页，即弹出纠错页和准备页
-                Navigator.of(context).pop(); // 弹出当前纠错页
-                Navigator.of(context).pop(); // 弹出准备页，回到主页
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3C9566),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          const SizedBox(height: 10),
+          ...checkItems.map(
+                (item) => _checkItem(item, _checkResults[item] ?? false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCorrectionAppBar(BuildContext context) {
+    return SizedBox(
+      height: 60,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      size: 20,
+                      color: Color(0xFF8B7D6B),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Spacer(),
+                  const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '灵枢 · AI',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'STXinwei',
+                        ),
+                      ),
+                      Text(
+                        '智能中医健康顾问',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF8B7D6B),
+                          letterSpacing: 1.5,
+                          fontFamily: 'STKaiti',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  const SizedBox(width: 40),
+                ],
               ),
-              child: const Text(
-                '结束练习',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'STKaiti',
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: -50,
+            child: Opacity(
+              opacity: 0.65,
+              child: Image.asset(
+                'assets/images/header_plum.png',
+                height: 100,
+                fit: BoxFit.contain,
+                alignment: Alignment.topRight,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, String subtitle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2D4A3E),
+            fontFamily: 'STKaiti',
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF6B5D4F),
+            fontFamily: 'STKaiti',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDemoVideoSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFEFB), Color(0xFFFDFCF7)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE8DCC8), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3C9566).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '动作演示视频',
+            style: TextStyle(
+              fontSize: 18,
+              color: Color(0xFF2D4A3E),
+              fontFamily: 'STKaiti',
+            ),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () {
+              if (!_isDemoVideoReady) return;
+              setState(() {
+                if (_demoVideoController.value.isPlaying) {
+                  _demoVideoController.pause();
+                } else {
+                  _demoVideoController.play();
+                }
+              });
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: double.infinity,
+                height: 180,
+                color: Colors.black,
+                child: _isDemoVideoReady
+                    ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _demoVideoController.value.size.width,
+                        height: _demoVideoController.value.size.height,
+                        child: VideoPlayer(_demoVideoController),
+                      ),
+                    ),
+                    if (!_demoVideoController.value.isPlaying)
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(
+                                  alpha: 0.1,
+                                ),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  width: 1.1,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '点击播放标准动作演示',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white.withValues(
+                                  alpha: 0.9,
+                                ),
+                                fontFamily: 'STKaiti',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                )
+                    : Center(
+                  child: _demoVideoError != null
+                      ? Text(
+                    _demoVideoError!,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontFamily: 'STKaiti',
+                    ),
+                  )
+                      : const CircularProgressIndicator(
+                    color: Colors.white70,
+                  ),
                 ),
               ),
             ),
@@ -1431,4 +2111,224 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
       ),
     );
   }
+
+  // void _showBottomSheet(BuildContext context, String actionName, List<String> checkItems, String suggestion) {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     backgroundColor: Colors.transparent,
+  //     isScrollControlled: true,
+  //     isDismissible: true,
+  //     enableDrag: true,
+  //     barrierColor: Colors.black54,
+  //     builder: (context) => StatefulBuilder(
+  //       builder: (context, setState) => SafeArea(child: Container(
+  //         decoration: const BoxDecoration(
+  //           color: Colors.white,
+  //           borderRadius: BorderRadius.only(
+  //             topLeft: Radius.circular(32),
+  //             topRight: Radius.circular(32),
+  //           ),
+  //         ),
+  //         child: _buildCorrectionPanel(
+  //           context,
+  //           actionName,
+  //           checkItems,
+  //           _currentSuggestion,
+  //           _poseAccuracy,
+  //           _checkResults,
+  //         ),
+  //       )),
+  //     ),
+  //   );
+  // }
+  //
+  // Widget _buildTopInfo(BuildContext context, String actionName, double stepProgress) {
+  //   return Padding(
+  //     padding: const EdgeInsets.all(20),
+  //     child: Row(
+  //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //       children: [
+  //         Column(
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             Text(
+  //               actionName,
+  //               style: const TextStyle(
+  //                 color: Colors.white,
+  //                 fontSize: 20,
+  //                 fontWeight: FontWeight.bold,
+  //                 fontFamily: 'STKaiti',
+  //               ),
+  //             ),
+  //             const SizedBox(height: 4),
+  //             Row(
+  //               children: [
+  //                 Text(
+  //                   '${_sportSequenceManager.currentStepIndex}/${_sportSequenceManager.totalSteps}',
+  //                   style: const TextStyle(color: Colors.white70, fontSize: 12),
+  //                 ),
+  //                 const SizedBox(width: 8),
+  //                 Container(
+  //                   width: 120,
+  //                   height: 4,
+  //                   decoration: BoxDecoration(
+  //                     color: Colors.white24,
+  //                     borderRadius: BorderRadius.circular(2),
+  //                   ),
+  //                   child: FractionallySizedBox(
+  //                     alignment: Alignment.centerLeft,
+  //                     widthFactor: stepProgress,
+  //                     child: Container(
+  //                       decoration: BoxDecoration(
+  //                         color: const Color(0xFF3C9566),
+  //                         borderRadius: BorderRadius.circular(2),
+  //                       ),
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //           ],
+  //         ),
+  //         Container(
+  //           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+  //           decoration: BoxDecoration(
+  //             color: Colors.white24,
+  //             borderRadius: BorderRadius.circular(10),
+  //           ),
+  //           child: Text(
+  //             '${(_sportSequenceManager.currentStepIndex / _sportSequenceManager.totalSteps * 100).toStringAsFixed(0)}%',
+  //             style: const TextStyle(
+  //               color: Colors.white,
+  //               fontWeight: FontWeight.bold,
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  // Widget _buildCorrectionPanel(
+  //     BuildContext context,
+  //     String actionName,
+  //     List<String> checkItems,
+  //     String currentSuggestion,
+  //     double poseAccuracy,
+  //     Map<String, bool> checkResults,
+  //     ) {
+  //   return Container(
+  //     padding: const EdgeInsets.all(24),
+  //     decoration: const BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.only(
+  //         topLeft: Radius.circular(32),
+  //         topRight: Radius.circular(32),
+  //       ),
+  //     ),
+  //     child: Column(
+  //       mainAxisSize: MainAxisSize.min,
+  //       children: [
+  //         Row(
+  //           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //           children: [
+  //             const Row(
+  //               children: [
+  //                 Icon(Icons.check_circle, color: Color(0xFF3C9566), size: 20),
+  //                 SizedBox(width: 8),
+  //                 Text(
+  //                   '姿态准确度',
+  //                   style: TextStyle(
+  //                     fontSize: 16,
+  //                     fontWeight: FontWeight.bold,
+  //                     color: Color(0xFF1E2939),
+  //                     fontFamily: 'STKaiti',
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //             Text(
+  //               '${poseAccuracy.toStringAsFixed(0)}%',
+  //               style: const TextStyle(
+  //                 fontSize: 24,
+  //                 fontWeight: FontWeight.bold,
+  //                 color: Color(0xFF3C9566),
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //         const SizedBox(height: 16),
+  //         Container(
+  //           padding: const EdgeInsets.all(16),
+  //           decoration: BoxDecoration(
+  //             color: const Color(0xFFFFF9E6),
+  //             borderRadius: BorderRadius.circular(16),
+  //             border: Border.all(color: const Color(0xFFFDE68A)),
+  //           ),
+  //           child: Row(
+  //             children: [
+  //               const Icon(
+  //                 Icons.info_outline,
+  //                 color: Color(0xFFD97706),
+  //                 size: 20,
+  //               ),
+  //               const SizedBox(width: 12),
+  //               Expanded(
+  //                 child: Text(
+  //                   currentSuggestion,
+  //                   style: const TextStyle(
+  //                     color: Color(0xFF92400E),
+  //                     fontSize: 14,
+  //                     fontFamily: 'STKaiti',
+  //                   ),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //         const SizedBox(height: 24),
+  //         Text(
+  //           actionName,
+  //           style: const TextStyle(
+  //             fontSize: 18,
+  //             fontWeight: FontWeight.bold,
+  //             color: Color(0xFF1E2939),
+  //             fontFamily: 'STKaiti',
+  //           ),
+  //         ),
+  //         const SizedBox(height: 12),
+  //         ...checkItems.asMap().entries.map((entry) {
+  //           final isChecked = checkResults[entry.value] ?? false;
+  //           return _checkItem(entry.value, isChecked);
+  //         }),
+  //         const SizedBox(height: 24),
+  //         SizedBox(
+  //           width: double.infinity,
+  //           height: 50,
+  //           child: ElevatedButton(
+  //             onPressed: () {
+  //               // 返回到运动主页，即弹出纠错页和准备页
+  //               Navigator.of(context).pop(); // 弹出当前纠错页
+  //               Navigator.of(context).pop(); // 弹出准备页，回到主页
+  //             },
+  //             style: ElevatedButton.styleFrom(
+  //               backgroundColor: const Color(0xFF3C9566),
+  //               foregroundColor: Colors.white,
+  //               shape: RoundedRectangleBorder(
+  //                 borderRadius: BorderRadius.circular(12),
+  //               ),
+  //             ),
+  //             child: const Text(
+  //               '结束练习',
+  //               style: TextStyle(
+  //                 fontWeight: FontWeight.bold,
+  //                 fontFamily: 'STKaiti',
+  //               ),
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 }

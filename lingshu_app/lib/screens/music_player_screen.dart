@@ -95,7 +95,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
     try {
       await _audioPlayer.stop();
-      await _audioPlayer.setSourceUrl(track.audioUrl);
+      await _audioPlayer.setSource(AssetSource(track.path));
       await _audioPlayer.resume();
     } catch (e) {
       if (!mounted) return;
@@ -214,7 +214,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                _buildLyricCard(),
+                //_buildLyricCard(),
                 const Spacer(flex: 2),
               ],
             ),
@@ -347,27 +347,27 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     );
   }
 
-  Widget _buildLyricCard() {
-    final lyric = _currentTrack.lyric?.trim();
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 32),
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8DCC8).withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        (lyric == null || lyric.isEmpty) ? '暂无歌词' : lyric,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: Colors.white,
-          height: 1.6,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
+  // Widget _buildLyricCard() {
+  //   final lyric = _currentTrack.lyric?.trim();
+  //   return Container(
+  //     margin: const EdgeInsets.symmetric(horizontal: 32),
+  //     width: double.infinity,
+  //     padding: const EdgeInsets.all(24),
+  //     decoration: BoxDecoration(
+  //       color: const Color(0xFFE8DCC8).withValues(alpha: 0.3),
+  //       borderRadius: BorderRadius.circular(12),
+  //     ),
+  //     child: Text(
+  //       (lyric == null || lyric.isEmpty) ? '暂无歌词' : lyric,
+  //       textAlign: TextAlign.center,
+  //       style: const TextStyle(
+  //         fontSize: 14,
+  //         fontWeight: FontWeight.w500,
+  //         color: Colors.white,
+  //         height: 1.6,
+  //         letterSpacing: 0.3,
+  //       ),
+  //     ),
+  //   );
+  // }
 }
