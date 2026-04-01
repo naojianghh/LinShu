@@ -88,21 +88,28 @@ class DtwPoseMatcher {
   final List<List<double>> _onlineBuffer = [];
   double? lastSimilarity;
   int _onlinePassStreak = 0;
+  int _onlinePassMissStreak = 0;
   bool _onlineStarted = false;
   // 为了避免“手已经抬到上方但还没开始动作”就触发 online 评估，
   // 需要先观测到手腕处于较低高度一段时间，再进入在线评估。
   bool _startArmed = false;
   int _startLowCount = 0;
   int _startPoseStreak = 0; // start pose 命中连续帧数
+  final List<double> _wristRelHistoryLeft = <double>[];
+  final List<double> _wristRelHistoryRight = <double>[];
+  static const int _wristMedianWindow = 5;
   static const int _onlineMaxBufferLen = 120; // 允许的最大缓存帧数（已做下采样）
   // 首次评估不要等太久：抬手进入 onlineStarted 后尽快给出第一帧相似度
   static const int _onlineMinBufferLen = 6; // 更短窗口，尽快给首帧反馈
   static const int _onlineEvalEveryFrames = 1; // 每帧都做一次评估
   static const int _onlinePassHoldFrames = 3; // 减少完成判定延迟
+  static const int _onlinePassMissToleranceFrames = 2; // 允许短时抖动不清零
 
   // 调试：只在 DTW 评估点打印
   int _onlineEvalCount = 0;
   double _onlineBestSimilarity = -1.0;
+  double _onlineSimilarityEma = 0.0;
+  bool _onlineHasEma = false;
   static const int _onlineDebugPrintEveryEvals = 10;
   int _startBlockedLogSkip = 0;
 
@@ -193,6 +200,32 @@ class DtwPoseMatcher {
   bool get isOnlineStarted => _onlineStarted;
   DtwFeatureMode get featureMode => _featureMode;
 
+  /// 基于当前模板（mean/std）计算 keypoints6 各维度偏差（绝对 z-score）。
+  /// 值越大表示与标准模板偏离越明显。
+  Map<String, double>? currentKeypoints6Deviation(Pose pose) {
+    if (_template == null) return null;
+    if (_template!.featureDim != 6) return null;
+    final vec = _extractFeatureVectorKeypoints6(pose);
+    if (vec == null) return null;
+
+    const names = <String>[
+      'leftElbowAngle',
+      'rightElbowAngle',
+      'leftWristRelYUp',
+      'rightWristRelYUp',
+      'shoulderYDiff',
+      'torsoCenterX',
+    ];
+
+    final out = <String, double>{};
+    for (int i = 0; i < 6; i++) {
+      final std = _template!.std[i] == 0 ? 1.0 : _template!.std[i];
+      final z = (vec[i] - _template!.mean[i]) / std;
+      out[names[i]] = z.abs();
+    }
+    return out;
+  }
+
   void setFeatureMode(DtwFeatureMode mode) {
     _featureMode = mode;
     resetRecording();
@@ -240,11 +273,16 @@ class DtwPoseMatcher {
     _startPoseStreak = 0;
     _onlineBuffer.clear();
     _onlinePassStreak = 0;
+    _onlinePassMissStreak = 0;
     lastSimilarity = null;
+    _wristRelHistoryLeft.clear();
+    _wristRelHistoryRight.clear();
 
     // 重置调试状态
     _onlineEvalCount = 0;
     _onlineBestSimilarity = -1.0;
+    _onlineSimilarityEma = 0.0;
+    _onlineHasEma = false;
     _startBlockedLogSkip = 0;
   }
 
@@ -271,8 +309,8 @@ class DtwPoseMatcher {
       // 先确认：手腕要“从低处抬起来”，而不是已经在高位直接开始算相似度。
       final wristRel = _wristRelYUpFromPose(pose);
       if (wristRel == null) return null;
-      final leftWristRelYUp = wristRel.$1;
-      final rightWristRelYUp = wristRel.$2;
+      final leftWristRelYUp = _appendAndMedian(_wristRelHistoryLeft, wristRel.$1);
+      final rightWristRelYUp = _appendAndMedian(_wristRelHistoryRight, wristRel.$2);
 
       if (_needsLowHoldBeforeStart()) {
         final lowNow = leftWristRelYUp < startWristRelYUpLow && rightWristRelYUp < startWristRelYUpLow;
@@ -314,6 +352,7 @@ class DtwPoseMatcher {
       _onlineStarted = true;
       _onlineBuffer.clear();
       _onlinePassStreak = 0;
+      _onlinePassMissStreak = 0;
       _frameCounter = 0;
       _startArmed = false;
       _startLowCount = 0;
@@ -339,22 +378,54 @@ class DtwPoseMatcher {
     if (_onlineBuffer.length < _onlineMinBufferLen) return null;
     if (_frameCounter % _onlineEvalEveryFrames != 0) return null;
 
-    // 取最近一段做评估：长度越小越快，但过短可能影响稳定性
+    // 多窗口评估：降低阶段错位导致的相似度剧烈回落
     final takeLen = math.min(_onlineBuffer.length, _onlineMaxBufferLen);
-    final windowSeq = _onlineBuffer.sublist(_onlineBuffer.length - takeLen);
+    final candidates = <int>{
+      takeLen,
+      math.max(_onlineMinBufferLen, (takeLen * 0.8).round()),
+      math.max(_onlineMinBufferLen, (takeLen * 0.6).round()),
+    }.toList()
+      ..sort();
 
-    final resized = _resampleToTargetLen(windowSeq, _template!.targetLen);
-    final dist = dtwDistance(
-      resized,
-      _templateStd,
-      window: 18,
-      dimsToUse: _useFullBodyByTemplate ? null : _trajectoryDims,
-    );
+    double bestDist = double.infinity;
+    double bestAvgCost = double.infinity;
+    double bestSimilarityRaw = 0.0;
+    int bestWindowLen = candidates.last;
+    List<List<double>>? bestResized;
 
-    final avgCost = dist / (resized.length + _templateStd.length);
-    // 更平滑的相似度映射：避免 exp 在 avgCost 稍大时下溢到 1e-100 级别
-    final similarity = 100.0 / (1.0 + avgCost / 50.0);
-    lastSimilarity = similarity.isFinite ? similarity.clamp(0.0, 100.0) : 0.0;
+    for (final candidateLen in candidates) {
+      final windowSeq = _onlineBuffer.sublist(_onlineBuffer.length - candidateLen);
+      final resized = _resampleToTargetLen(windowSeq, _template!.targetLen);
+      final dist = dtwDistance(
+        resized,
+        _templateStd,
+        window: 18,
+        dimsToUse: _useFullBodyByTemplate ? null : _trajectoryDims,
+      );
+      final avgCost = dist / (resized.length + _templateStd.length);
+      final simRaw = 100.0 / (1.0 + avgCost / 50.0);
+      if (simRaw > bestSimilarityRaw) {
+        bestSimilarityRaw = simRaw;
+        bestDist = dist;
+        bestAvgCost = avgCost;
+        bestWindowLen = candidateLen;
+        bestResized = resized;
+      }
+    }
+
+    final similarityRaw = bestSimilarityRaw.isFinite
+        ? bestSimilarityRaw.clamp(0.0, 100.0)
+        : 0.0;
+    const emaAlpha = 0.35;
+    if (!_onlineHasEma) {
+      _onlineSimilarityEma = similarityRaw;
+      _onlineHasEma = true;
+    } else {
+      _onlineSimilarityEma =
+          _onlineSimilarityEma * (1.0 - emaAlpha) + similarityRaw * emaAlpha;
+    }
+    final similarity = math.max(similarityRaw, _onlineSimilarityEma);
+    lastSimilarity = similarity;
 
     // ===== 调试日志（只在真正评估DTW时打印）=====
     _onlineEvalCount++;
@@ -376,8 +447,9 @@ class DtwPoseMatcher {
       }
       Log.d(
         'DTW[eval=$_onlineEvalCount] frame=$_frameCounter onlineStarted=$_onlineStarted '
-        'bufLen=${_onlineBuffer.length} takeLen=$takeLen resizedLen=${resized.length} '
-        'dist=${dist.toStringAsFixed(4)} avgCost=${avgCost.toStringAsFixed(6)} sim=${similarity.toStringAsFixed(2)} '
+        'bufLen=${_onlineBuffer.length} takeLen=$takeLen bestWin=$bestWindowLen resizedLen=${bestResized?.length ?? 0} '
+        'dist=${bestDist.toStringAsFixed(4)} avgCost=${bestAvgCost.toStringAsFixed(6)} '
+        'simRaw=${similarityRaw.toStringAsFixed(2)} simEma=${_onlineSimilarityEma.toStringAsFixed(2)} simOut=${similarity.toStringAsFixed(2)} '
         'vecRaw=${_formatVec(vecRaw)} vecStd=${_formatVec(vecStd)} '
         'rawY(nose/lw/rw)=(${noseY?.toStringAsFixed(3) ?? 'NA'},${leftWristY?.toStringAsFixed(3) ?? 'NA'},${rightWristY?.toStringAsFixed(3) ?? 'NA'}) '
         'bodyH(px)=$bodyHDebug',
@@ -389,31 +461,39 @@ class DtwPoseMatcher {
       final wristRelNow = _wristRelYUpFromPose(pose);
       if (wristRelNow == null) {
         _onlinePassStreak = 0;
+        _onlinePassMissStreak = 0;
         return null;
       }
-      final leftWristRelYUpNow = wristRelNow.$1;
-      final rightWristRelYUpNow = wristRelNow.$2;
+      final leftWristRelYUpNow = _appendAndMedian(_wristRelHistoryLeft, wristRelNow.$1);
+      final rightWristRelYUpNow = _appendAndMedian(_wristRelHistoryRight, wristRelNow.$2);
       final wristsOk = _isPassWristPoseOk(leftWristRelYUpNow, rightWristRelYUpNow);
 
       if (wristsOk) {
         _onlinePassStreak++;
+        _onlinePassMissStreak = 0;
         if (_onlinePassStreak >= _onlinePassHoldFrames) {
           // 命中完成后清理缓存，避免重复触发
           _onlinePassStreak = 0;
+          _onlinePassMissStreak = 0;
           _onlineBuffer.clear();
           _onlineStarted = false;
           return DtwMatchResult(
             similarity: lastSimilarity!,
             passed: true,
-            dtwDistance: dist,
+            dtwDistance: bestDist,
           );
         }
       } else {
-        // 相似度足够但手腕高度不足：重置连续命中
-        _onlinePassStreak = 0;
+        // 相似度足够但手腕高度不足：允许短时抖动容错
+        _onlinePassMissStreak++;
+        if (_onlinePassMissStreak > _onlinePassMissToleranceFrames) {
+          _onlinePassStreak = 0;
+          _onlinePassMissStreak = 0;
+        }
       }
     } else {
       _onlinePassStreak = 0;
+      _onlinePassMissStreak = 0;
     }
 
     return null;
@@ -671,47 +751,132 @@ class DtwPoseMatcher {
   }
 
   bool _isStartWristPoseOk(double leftWristRelYUp, double rightWristRelYUp) {
+    final tplStartL = _templateWristThresholdStart(2);
+    final tplStartR = _templateWristThresholdStart(3);
     switch (_actionType) {
       case '双手托天':
-        return leftWristRelYUp >= _startWristRelYUpStep1 &&
-            rightWristRelYUp >= _startWristRelYUpStep1;
+        final thL = tplStartL ?? _startWristRelYUpStep1;
+        final thR = tplStartR ?? _startWristRelYUpStep1;
+        return leftWristRelYUp >= thL && rightWristRelYUp >= thR;
       case '左右开弓-左':
-        return leftWristRelYUp >= _startWristRelYUpStep2;
+        final dominantRight = _isRightWristDominantByTemplate();
+        return dominantRight
+            ? rightWristRelYUp >= (tplStartR ?? _startWristRelYUpStep2)
+            : leftWristRelYUp >= (tplStartL ?? _startWristRelYUpStep2);
       case '左右开弓-右':
-        return rightWristRelYUp >= _startWristRelYUpStep2;
+        final dominantRight = _isRightWristDominantByTemplate();
+        return dominantRight
+            ? rightWristRelYUp >= (tplStartR ?? _startWristRelYUpStep2)
+            : leftWristRelYUp >= (tplStartL ?? _startWristRelYUpStep2);
       case '调理脾胃-左':
-        return leftWristRelYUp >= _startWristRelYUpStep3;
+        // 优先按模板自动识别“主导抬手侧”，避免左/右写死与模板不符
+        final dominantRight = _isRightWristDominantByTemplate();
+        return dominantRight
+            ? rightWristRelYUp >= (tplStartR ?? _startWristRelYUpStep3)
+            : leftWristRelYUp >= (tplStartL ?? _startWristRelYUpStep3);
       case '调理脾胃-右':
-        return rightWristRelYUp >= _startWristRelYUpStep3;
+        final dominantRight = _isRightWristDominantByTemplate();
+        return dominantRight
+            ? rightWristRelYUp >= (tplStartR ?? _startWristRelYUpStep3)
+            : leftWristRelYUp >= (tplStartL ?? _startWristRelYUpStep3);
       case '摇头摆尾-左':
       case '摇头摆尾-右':
-        return true;
+        final dominantRight = _isRightWristDominantByTemplate();
+        final thL = tplStartL ?? _startWristRelYUpStep3;
+        final thR = tplStartR ?? _startWristRelYUpStep3;
+        return dominantRight
+            ? rightWristRelYUp >= thR
+            : leftWristRelYUp >= thL;
       default:
-        return leftWristRelYUp >= _startWristRelYUpStep1 &&
-            rightWristRelYUp >= _startWristRelYUpStep1;
+        final thL = tplStartL ?? _startWristRelYUpStep1;
+        final thR = tplStartR ?? _startWristRelYUpStep1;
+        return leftWristRelYUp >= thL && rightWristRelYUp >= thR;
     }
   }
 
   bool _isPassWristPoseOk(double leftWristRelYUp, double rightWristRelYUp) {
+    final tplPassL = _templateWristThresholdPass(2);
+    final tplPassR = _templateWristThresholdPass(3);
     switch (_actionType) {
       case '双手托天':
-        return leftWristRelYUp >= _passWristRelYUpStep1 &&
-            rightWristRelYUp >= _passWristRelYUpStep1;
+        final thL = tplPassL ?? _passWristRelYUpStep1;
+        final thR = tplPassR ?? _passWristRelYUpStep1;
+        return leftWristRelYUp >= thL && rightWristRelYUp >= thR;
       case '左右开弓-左':
-        return leftWristRelYUp >= _passWristRelYUpStep2;
+        final dominantRight = _isRightWristDominantByTemplate();
+        return dominantRight
+            ? rightWristRelYUp >= (tplPassR ?? _passWristRelYUpStep2)
+            : leftWristRelYUp >= (tplPassL ?? _passWristRelYUpStep2);
       case '左右开弓-右':
-        return rightWristRelYUp >= _passWristRelYUpStep2;
+        final dominantRight = _isRightWristDominantByTemplate();
+        return dominantRight
+            ? rightWristRelYUp >= (tplPassR ?? _passWristRelYUpStep2)
+            : leftWristRelYUp >= (tplPassL ?? _passWristRelYUpStep2);
       case '调理脾胃-左':
-        return rightWristRelYUp >= _passWristRelYUpStep3;
+        final dominantRight = _isRightWristDominantByTemplate();
+        return dominantRight
+            ? rightWristRelYUp >= (tplPassR ?? _passWristRelYUpStep3)
+            : leftWristRelYUp >= (tplPassL ?? _passWristRelYUpStep3);
       case '调理脾胃-右':
-        return leftWristRelYUp >= _passWristRelYUpStep3;
+        final dominantRight = _isRightWristDominantByTemplate();
+        return dominantRight
+            ? rightWristRelYUp >= (tplPassR ?? _passWristRelYUpStep3)
+            : leftWristRelYUp >= (tplPassL ?? _passWristRelYUpStep3);
       case '摇头摆尾-左':
       case '摇头摆尾-右':
-        return true;
+        final dominantRight = _isRightWristDominantByTemplate();
+        final thL = tplPassL ?? _passWristRelYUpStep3;
+        final thR = tplPassR ?? _passWristRelYUpStep3;
+        return dominantRight
+            ? rightWristRelYUp >= thR
+            : leftWristRelYUp >= thL;
       default:
         return leftWristRelYUp >= passWristRelYUpMin &&
             rightWristRelYUp >= passWristRelYUpMin;
     }
+  }
+
+  /// 调试：返回当前帧左右手腕相对鼻子的 y-up（与门控同一口径）。
+  (double, double)? debugWristRelYUp(Pose pose) {
+    return _wristRelYUpFromPose(pose);
+  }
+
+  bool _isRightWristDominantByTemplate() {
+    if (_template == null || _template!.featureDim < 4) return false;
+    // keypoints6: index 2=leftWristRelYUp, index 3=rightWristRelYUp
+    return _template!.mean[3] > _template!.mean[2];
+  }
+
+  double? _templateWristThresholdStart(int dim) {
+    return _templateWristPercentile(dim, 0.35);
+  }
+
+  double? _templateWristThresholdPass(int dim) {
+    return _templateWristPercentile(dim, 0.70);
+  }
+
+  double? _templateWristPercentile(int dim, double p) {
+    if (_template == null) return null;
+    if (_template!.featureDim <= dim) return null;
+    final rows = _template!.features;
+    if (rows.isEmpty) return null;
+    final values = rows.map((row) => row[dim]).toList()..sort();
+    final pos = (values.length - 1) * p.clamp(0.0, 1.0);
+    final i0 = pos.floor();
+    final i1 = math.min(values.length - 1, i0 + 1);
+    final a = pos - i0;
+    return values[i0] * (1 - a) + values[i1] * a;
+  }
+
+  double _appendAndMedian(List<double> history, double value) {
+    history.add(value);
+    if (history.length > _wristMedianWindow) {
+      history.removeAt(0);
+    }
+    final sorted = [...history]..sort();
+    final n = sorted.length;
+    if (n.isOdd) return sorted[n ~/ 2];
+    return (sorted[n ~/ 2 - 1] + sorted[n ~/ 2]) / 2.0;
   }
 
   (double, double)? _wristRelYUpFromPose(Pose pose) {

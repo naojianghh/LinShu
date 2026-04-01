@@ -1,6 +1,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -57,6 +58,19 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
   int _streamSessionId = 0; // 每次开始一段流会话就递增
   bool _isPoseStreamRunning = false;
   bool _isProcessingFrame = false;
+  DateTime _lastCorrectionHintAt = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime? _actionStartedAt;
+  static const Duration _hintShowDelayAfterActionStart = Duration(seconds: 5);
+  static const Duration _correctionHintInterval = Duration(seconds: 5);
+  DateTime _actionCompletedFreezeUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  static const Duration _actionCompletedFreezeDuration = Duration(seconds: 10);
+  double _actionPeakAccuracy = 0.0;
+  DateTime _lastPeakAccuracyAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static const Duration _peakAccuracyResetDelay = Duration(seconds: 10);
+  DateTime _lastStep3DebugLogAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static const Duration _step3DebugLogInterval = Duration(milliseconds: 500);
+  static const bool _enableStep3ActionStreamLog = true;
+  static const bool _enableRealtimePoseLog = true;
 
   /// 演示视频异步加载序号，避免快速切换「第N式」时旧请求覆盖新状态。
   int _demoVideoLoadGeneration = 0;
@@ -173,13 +187,9 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
 
     // 初始化校准和分析器
     _userCalibration = UserCalibration();
-    //final thresholdManager = DynamicThresholdManager();
-    //_actionAnalyzer = ActionAnalyzer(_userCalibration, thresholdManager);
 
     // 初始化运动序列管理器
     _sportSequenceManager = _createSportSequenceManager();
-    // 设置校准系统
-    //_sportSequenceManager.setUserCalibration(_userCalibration);
 
     // 开始校准流程
     _startCalibration();
@@ -219,6 +229,18 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
             },
           ),
           ActionStep(
+            name: '左右开弓似射雕-左',
+            actionType: '左右开弓-左',
+            checkItems: ['马步稳健', '手臂伸展', '转腰拧胯'],
+            description: '左式：左脚向左开步，成马步，双手拉弓如射雕状',
+          ),
+          ActionStep(
+            name: '左右开弓似射雕-右',
+            actionType: '左右开弓-右',
+            checkItems: ['马步稳健', '手臂伸展', '转腰拧胯'],
+            description: '右式：与左式方向相反，完成另一侧开弓',
+          ),
+          ActionStep(
             name: '调理脾胃须单举-左',
             actionType: '调理脾胃-左',
             checkItems: ['单臂上举', '另一臂下按', '意念脾胃'],
@@ -241,18 +263,6 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
             actionType: '摇头摆尾-右',
             checkItems: ['马步下蹲', '摇头摆尾', '呼吸协调'],
             description: '马步下蹲，上体前倾，左右摇头摆尾',
-          ),
-          ActionStep(
-            name: '左右开弓似射雕-左',
-            actionType: '左右开弓-左',
-            checkItems: ['马步稳健', '手臂伸展', '转腰拧胯'],
-            description: '左式：左脚向左开步，成马步，双手拉弓如射雕状',
-          ),
-          ActionStep(
-            name: '左右开弓似射雕-右',
-            actionType: '左右开弓-右',
-            checkItems: ['马步稳健', '手臂伸展', '转腰拧胯'],
-            description: '右式：与左式方向相反，完成另一侧开弓',
           ),
         ],previewSize: widget.cameraController!.value.previewSize!);
       case '瑜伽':
@@ -764,6 +774,132 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     }
   }
 
+  List<String> _checkItemsByActionType(String actionType) {
+    switch (actionType) {
+      case '双手托天':
+        return const ['手臂伸展', '腰背挺直', '呼吸自然'];
+      case '左右开弓-左':
+      case '左右开弓-右':
+        return const ['马步稳健', '手臂伸展', '转腰拧胯'];
+      case '调理脾胃-左':
+      case '调理脾胃-右':
+        return const ['单臂上举', '另一臂下按', '意念脾胃'];
+      case '摇头摆尾-左':
+      case '摇头摆尾-右':
+        return const ['马步下蹲', '摇头摆尾', '呼吸协调'];
+      default:
+        return const [];
+    }
+  }
+
+  List<String> _displayGuideItemsByActionType(String actionType) {
+    switch (actionType) {
+      case '双手托天':
+        return const ['两掌上托，手臂伸直', '掌心向上，目视手背', '腰背中正，呼吸均匀'];
+      case '左右开弓-左':
+      case '左右开弓-右':
+        return const ['马步下沉，重心稳定', '一手推掌，一手拉弓', '目视前手指尖，沉肩坠肘'];
+      case '调理脾胃-左':
+      case '调理脾胃-右':
+        return const ['一手上托，一手下按', '双掌上下对拉，力达指端', '脊柱中正，动作舒缓连贯'];
+      case '摇头摆尾-左':
+      case '摇头摆尾-右':
+        // 第4式 UI 当前展示文案对应此分支
+        return const ['头颈缓慢后转，幅度适中', '目随视线看后方', '双肩放松，躯干保持稳定'];
+      default:
+        return const [];
+    }
+  }
+
+  Map<String, String> _checkItemFeatureMap(String actionType) {
+    switch (actionType) {
+      case '双手托天':
+        return const {
+          '手臂伸展': 'leftElbowAngle',
+          '腰背挺直': 'torsoCenterX',
+          '呼吸自然': 'shoulderYDiff',
+        };
+      case '左右开弓-左':
+      case '左右开弓-右':
+        return const {
+          '马步稳健': 'torsoCenterX',
+          '手臂伸展': 'leftElbowAngle',
+          '转腰拧胯': 'shoulderYDiff',
+        };
+      case '调理脾胃-左':
+      case '调理脾胃-右':
+        return const {
+          '单臂上举': 'leftWristRelYUp',
+          '另一臂下按': 'rightWristRelYUp',
+          '意念脾胃': 'torsoCenterX',
+        };
+      case '摇头摆尾-左':
+      case '摇头摆尾-右':
+        return const {
+          '马步下蹲': 'torsoCenterX',
+          '摇头摆尾': 'shoulderYDiff',
+          '呼吸协调': 'rightElbowAngle',
+        };
+      default:
+        return const {};
+    }
+  }
+
+  String _featureCorrectionHint(String actionType, String featureKey) {
+    switch (featureKey) {
+      case 'leftElbowAngle':
+      case 'rightElbowAngle':
+        return '手臂角度偏差较大，注意肘部再舒展一些';
+      case 'leftWristRelYUp':
+        return actionType.contains('调理脾胃') ? '上托手还不够到位，请继续上举' : '左手轨迹偏差较大，抬手高度再稳定一些';
+      case 'rightWristRelYUp':
+        return actionType.contains('调理脾胃') ? '下按手位置不稳定，请保持下按发力' : '右手轨迹偏差较大，抬手高度再稳定一些';
+      case 'shoulderYDiff':
+        return '左右肩不够平稳，请放松并保持肩线稳定';
+      case 'torsoCenterX':
+        return '躯干重心偏移较大，请收紧核心保持中正';
+      default:
+        return '当前动作有偏差，请按动作要领微调';
+    }
+  }
+
+  void _updateCheckResultsByDeviation(
+    String actionType,
+    Map<String, double>? deviation, {
+    required bool passed,
+  }) {
+    final items = _checkItemsByActionType(actionType);
+    final displayItems = _displayGuideItemsByActionType(actionType);
+    if (items.isEmpty) return;
+
+    final prevResults = Map<String, bool>.from(_checkResults);
+    final nextResults = <String, bool>{};
+    if (passed) {
+      for (final item in items) {
+        nextResults[item] = true;
+      }
+      for (final item in displayItems) {
+        nextResults[item] = true;
+      }
+      _checkResults = nextResults;
+      return;
+    }
+
+    final itemFeature = _checkItemFeatureMap(actionType);
+    const passThreshold = 1.15;
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      final checked = ((deviation?[itemFeature[item]] ?? 99.0) <= passThreshold);
+      // 勾选状态单向置真：一旦通过，不再回退为 false
+      nextResults[item] = (prevResults[item] ?? false) || checked;
+      if (i < displayItems.length) {
+        final displayItem = displayItems[i];
+        nextResults[displayItem] = (prevResults[displayItem] ?? false) || checked;
+      }
+    }
+    _checkResults = nextResults;
+  }
+
   void _analyzePose(Pose pose) {
     if (!_isCalibrated) {
       _currentSuggestion = '请先完成校准';
@@ -775,9 +911,19 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
       _currentSuggestion = '运动序列已完成！';
       return;
     }
-
-    // DTW：第1式 + 第2式左/右 + 第3式 + 第4式都走模板比对
+    final now = DateTime.now();
     final actionType = _sportSequenceManager.currentStep.actionType;
+    if (_enableRealtimePoseLog) {
+      _logRealtimePosePoints(pose, actionType);
+    }
+    if (now.isBefore(_actionCompletedFreezeUntil)) {
+      // 动作通过后冻结提示与准确度，避免短时间内被后续帧覆盖
+      return;
+    }
+    if (_isActionCompleted && !now.isBefore(_actionCompletedFreezeUntil)) {
+      // 冻结期结束后恢复实时状态
+      _isActionCompleted = false;
+    }
     final bool useDtwStep1 = _dtwReadyStep1 && actionType == '双手托天';
     final bool useDtwStep2Left = _dtwReadyStep2Left && actionType == '左右开弓-左';
     final bool useDtwStep2Right = _dtwReadyStep2Right && actionType == '左右开弓-右';
@@ -801,49 +947,77 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
                         ? _dtwMatcherStep4Left : _dtwMatcherStep4Right)))));
       activeMatcher.setActionType(actionType);
       final vec = activeMatcher.extractFeatureVector(pose);
-      _checkResults = {};
-
-      if (vec != null && useDtwStep1) {
-        // 第一式保留原有显示语义
-        _checkResults['手臂伸展'] = true;
-        _checkResults['腰背挺直'] = true;
-        _checkResults['呼吸自然'] = true;
-      } else if (vec != null && (useDtwStep2Left || useDtwStep2Right)) {
-        // 第二式改为 DTW 主判定；逐项提示先给稳定占位
-        _checkResults['马步稳健'] = true;
-        _checkResults['手臂伸展'] = true;
-        _checkResults['转腰拧胯'] = true;
-      } else if (vec != null && useDtwStep3Right || useDtwStep3Left) {
-        // 第三式改为 DTW 主判定；逐项提示先给稳定占位
-        _checkResults['单臂上举'] = true;
-        _checkResults['另一臂下按'] = true;
-        _checkResults['意念脾胃'] = true;
-      } else if (vec != null && useDtwStep4Left || useDtwStep4Right) {
-        // 第四式改为 DTW 主判定；逐项提示先给稳定占位
-        _checkResults['马步下蹲'] = true;
-        _checkResults['摇头摆尾'] = true;
-        _checkResults['呼吸协调'] = true;
+      if (vec != null) {
+        _actionStartedAt ??= now;
       }
+      final deviation = activeMatcher.currentKeypoints6Deviation(pose);
 
       // 在线匹配：出现足够匹配的片段就判定完成（不会再返回“不通过”）
       final dtwResult = activeMatcher.updateOnline(pose);
       // 没进入在线评估前，不展示 lastSimilarity，避免“没开始动作相似度就跳起来”
       final sim = activeMatcher.isOnlineStarted ? (activeMatcher.lastSimilarity ?? 0.0) : 0.0;
-      _poseAccuracy = sim;
+      if (sim > _actionPeakAccuracy) {
+        _actionPeakAccuracy = sim;
+        _lastPeakAccuracyAt = now;
+      } else if (_actionPeakAccuracy > 0 &&
+          _lastPeakAccuracyAt.millisecondsSinceEpoch > 0 &&
+          now.difference(_lastPeakAccuracyAt) >= _peakAccuracyResetDelay) {
+        _actionPeakAccuracy = 0;
+        _lastPeakAccuracyAt = DateTime.fromMillisecondsSinceEpoch(0);
+      }
+      _poseAccuracy = _actionPeakAccuracy;
       _isActionCompleted = false;
 
       if (dtwResult != null) {
-        _poseAccuracy = dtwResult.similarity;
+        if (dtwResult.similarity > _actionPeakAccuracy) {
+          _actionPeakAccuracy = dtwResult.similarity;
+          _lastPeakAccuracyAt = now;
+        }
+        _poseAccuracy = _actionPeakAccuracy;
         _isActionCompleted = dtwResult.passed;
-        _currentSuggestion = '通过！相似度: ${dtwResult.similarity.toStringAsFixed(0)}%';
-
         if (dtwResult.passed) {
+          final switchedToPaired = _tryAdvanceToPairedAction(actionType);
+          if (switchedToPaired) {
+            return;
+          }
+          _updateCheckResultsByDeviation(actionType, deviation, passed: true);
+          _actionCompletedFreezeUntil =
+              DateTime.now().add(_actionCompletedFreezeDuration);
           // 不自动进入下一步：由用户在下方「第N式」标签手动切换
           _currentSuggestion =
               '本式已通过！请手动切换下方「第1式」～「第4式」标签继续练习。';
+        } else {
+          _currentSuggestion = '动作接近完成，相似度: ${dtwResult.similarity.toStringAsFixed(0)}%';
         }
       } else {
-        _currentSuggestion = '匹配中... 相似度: ${sim.toStringAsFixed(0)}%';
+        final canShowCorrectionHint =
+            _actionStartedAt != null &&
+            now.difference(_actionStartedAt!) >= _hintShowDelayAfterActionStart;
+        if (!canShowCorrectionHint) {
+          _currentSuggestion = '动作已识别，继续保持';
+          return;
+        }
+        final shouldRefreshHint =
+            now.difference(_lastCorrectionHintAt) >= _correctionHintInterval;
+        if (shouldRefreshHint) {
+          _lastCorrectionHintAt = now;
+          if (deviation != null && deviation.isNotEmpty) {
+            final itemFeature = _checkItemFeatureMap(actionType);
+            String worstFeature = 'torsoCenterX';
+            double worstValue = -1;
+            for (final feature in itemFeature.values) {
+              final value = deviation[feature] ?? -1;
+              if (value > worstValue) {
+                worstValue = value;
+                worstFeature = feature;
+              }
+            }
+            _currentSuggestion =
+                _featureCorrectionHint(actionType, worstFeature);
+          } else {
+            _currentSuggestion = '识别中，请按动作要领继续完成当前式';
+          }
+        }
       }
 
       Log.d(
@@ -853,84 +1027,42 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
       );
       return;
     }
+  }
 
-    // // 使用新的动作分析系统（非第1式）
-    // // 先尽早检测“开始点”，便于在做错后可以重置并重新采集起点/终点。
-    // _sportSequenceManager.detectActionStart(pose);
-    //
-    // final result = _actionAnalyzer.analyzeAction(
-    //   pose,
-    //   _sportSequenceManager.currentStep.actionType,
-    //   _userProfile,
-    // );
-    //
-    // _poseAccuracy = result.similarity * 100;
-    //
-    // // 分析轨迹是否完成当前动作
-    // _isActionCompleted = _sportSequenceManager.analyzeTrajectory(pose, result);
-    //
-    // // 如果动作偏差较大（准确度持续较低），且已经检测到开始点，则重置当前 step 的点集并重新检测
-    // final hasDetectedStart = _sportSequenceManager.startLandmarks != null;
-    // final bool shouldRetry = !_isActionCompleted &&
-    //     hasDetectedStart &&
-    //     _poseAccuracy < 50;
-    //
-    // if (shouldRetry) {
-    //   _lowAccuracyStreak++;
-    //   final now = DateTime.now();
-    //   final cooldownOk = _lastRetryTime == null || now.difference(_lastRetryTime!) >= _retryCooldown;
-    //
-    //   if (_lowAccuracyStreak >= _lowAccuracyFramesToRetry && cooldownOk) {
-    //     _sportSequenceManager.retryCurrentStep();
-    //     _lastRetryTime = now;
-    //     _lowAccuracyStreak = 0;
-    //
-    //     setState(() {
-    //       _isActionCompleted = false;
-    //       _currentSuggestion = '动作偏差较大，已重置，请重新开始 ${_sportSequenceManager.currentStep.name}';
-    //     });
-    //     return; // 退出，避免下面的默认建议覆盖本次“重置”提示
-    //   }
-    // } else {
-    //   _lowAccuracyStreak = 0;
-    // }
-    //
-    // // 更新检查结果
-    // _checkResults = {};
-    // if (result.angles.isNotEmpty) {
-    //   // 根据角度结果更新检查项
-    //   if (result.angles.containsKey('leftElbow') && result.angles.containsKey('rightElbow')) {
-    //     final leftElbowAngle = result.angles['leftElbow']!;
-    //     final rightElbowAngle = result.angles['rightElbow']!;
-    //     _checkResults['手臂伸展'] = leftElbowAngle > 160 && rightElbowAngle > 160;
-    //   }
-    //
-    //   if (result.angles.containsKey('leftKnee') && result.angles.containsKey('rightKnee')) {
-    //     final leftKneeAngle = result.angles['leftKnee']!;
-    //     final rightKneeAngle = result.angles['rightKnee']!;
-    //     _checkResults['双腿伸直'] = leftKneeAngle > 160 && rightKneeAngle > 160;
-    //   }
-    // }
-    //
-    // // 更新建议
-    // if (_isActionCompleted) {
-    //   _currentSuggestion = '动作完成！准备进入下一步...';
-    //   // 延迟一秒后进入下一步
-    //   Future.delayed(const Duration(seconds: 1), () {
-    //     _nextActionStep();
-    //   });
-    // } else if (_poseAccuracy >= 80) {
-    //   _currentSuggestion = '姿势标准，继续保持！';
-    // } else if (_poseAccuracy >= 50) {
-    //   _currentSuggestion = '姿势基本正确，可适当调整';
-    // } else {
-    //   _currentSuggestion = '请调整姿势，按提示纠正';
-    // }
-    //
-    // Log.d('检查项: $_checkResults', tag: 'analyzePose');
-    // Log.d('准确度: ${_poseAccuracy.toStringAsFixed(1)}%', tag: 'analyzePose');
-    // Log.d('提示: $_currentSuggestion', tag: 'analyzePose');
-    // Log.d('当前动作: ${_sportSequenceManager.currentStep.name} (${_sportSequenceManager.currentStepIndex}/${_sportSequenceManager.totalSteps})', tag: 'analyzePose');
+  void _logRealtimePosePoints(Pose pose, String actionType) {
+    String point(PoseLandmarkType type) {
+      final lm = pose.landmarks[type];
+      if (lm == null) return 'NA';
+      return '${lm.x.toStringAsFixed(3)},${lm.y.toStringAsFixed(3)},${lm.z.toStringAsFixed(3)}';
+    }
+
+    (double, double)? wristRel;
+    final matcher = actionType == '双手托天'
+        ? _dtwMatcherStep1
+        : (actionType == '左右开弓-左'
+            ? _dtwMatcherStep2Left
+            : (actionType == '左右开弓-右'
+                ? _dtwMatcherStep2Right
+                : (actionType == '调理脾胃-左'
+                    ? _dtwMatcherStep3Left
+                    : (actionType == '调理脾胃-右'
+                        ? _dtwMatcherStep3Right
+                        : (actionType == '摇头摆尾-左'
+                            ? _dtwMatcherStep4Left
+                            : _dtwMatcherStep4Right)))));
+    wristRel = matcher.debugWristRelYUp(pose);
+
+    Log.d(
+      '[POSE_STREAM] action=$actionType '
+      'nose=${point(PoseLandmarkType.nose)} '
+      'ls=${point(PoseLandmarkType.leftShoulder)} rs=${point(PoseLandmarkType.rightShoulder)} '
+      'le=${point(PoseLandmarkType.leftElbow)} re=${point(PoseLandmarkType.rightElbow)} '
+      'lw=${point(PoseLandmarkType.leftWrist)} rw=${point(PoseLandmarkType.rightWrist)} '
+      'lh=${point(PoseLandmarkType.leftHip)} rh=${point(PoseLandmarkType.rightHip)} '
+      'wristRelL=${wristRel?.$1.toStringAsFixed(3) ?? 'NA'} '
+      'wristRelR=${wristRel?.$2.toStringAsFixed(3) ?? 'NA'}',
+      tag: 'POSE_STREAM',
+    );
   }
 
   void _resetDtwMatchers() {
@@ -947,11 +1079,32 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
   int _baduanjinGuideTabToSequenceIndex(int tabIndex) {
     const mapping = <int, int>{
       0: 0, // 两手托天理三焦 -> 双手托天
-      1: 5, // 左右开弓似射雕 -> 左右开弓-左
-      2: 1, // 调理脾胃须单举 -> 调理脾胃-左
-      3: 3, // 与模板中「摇头摆尾」对应（演示为单式左）
+      1: 1, // 左右开弓似射雕 -> 左右开弓-左
+      2: 3, // 调理脾胃须单举 -> 调理脾胃-左
+      3: 5, // 与模板中「摇头摆尾」对应（演示为单式左）
     };
     return mapping[tabIndex] ?? 0;
+  }
+
+  bool _isDualActionGuideTab() {
+    return widget.sportType == '八段锦' && _selectedGuideTab > 0;
+  }
+
+  bool _tryAdvanceToPairedAction(String actionType) {
+    // 第2~第4式：左侧通过后自动切到右侧；右侧通过才算本式完成。
+    if (!_isDualActionGuideTab()) return false;
+    if (!actionType.endsWith('-左')) return false;
+    final leftStepIndex = _baduanjinGuideTabToSequenceIndex(_selectedGuideTab);
+    _sportSequenceManager.setStepIndex(leftStepIndex + 1);
+    _resetDtwMatchers();
+    _isActionCompleted = false;
+    _poseAccuracy = 0;
+    _actionPeakAccuracy = 0;
+    _lastPeakAccuracyAt = DateTime.fromMillisecondsSinceEpoch(0);
+    _actionStartedAt = null;
+    _lastCorrectionHintAt = DateTime.fromMillisecondsSinceEpoch(0);
+    _currentSuggestion = '左侧已通过，请继续完成右侧动作';
+    return true;
   }
 
   void _onGuideTabSelected(int index) {
@@ -962,6 +1115,12 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
         _selectedGuideTab = index;
         _isActionCompleted = false;
         _poseAccuracy = 0;
+        _actionPeakAccuracy = 0;
+        _lastPeakAccuracyAt = DateTime.fromMillisecondsSinceEpoch(0);
+        _actionStartedAt = null;
+        _actionCompletedFreezeUntil = DateTime.fromMillisecondsSinceEpoch(0);
+        _lastCorrectionHintAt = DateTime.fromMillisecondsSinceEpoch(0);
+        _checkResults = {};
         _currentSuggestion = '请开始 ${_sportSequenceManager.currentStep.name}';
       });
       unawaited(_reloadDemoVideoForCurrentGuideTab());
@@ -1048,196 +1207,6 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
     super.dispose();
   }
 
-  // @override
-  // Widget build(BuildContext context) {
-  //   // 获取当前动作步骤
-  //   final currentStep = _sportSequenceManager.currentStep;
-  //   final stepProgress = _sportSequenceManager.currentStepIndex / _sportSequenceManager.totalSteps;
-  //
-  //   String actionName = currentStep.name;
-  //   List<String> checkItems = currentStep.checkItems;
-  //   String suggestion = _currentSuggestion.isNotEmpty ? _currentSuggestion : '请站到画面中央，准备开始 ${currentStep.name}';
-  //
-  //   return Scaffold(
-  //     backgroundColor: const Color(0xFFFDFCF7),
-  //     body: SafeArea(child: Stack(
-  //       children: [
-  //         // 相机背景
-  //         if (widget.cameraController != null && widget.cameraController!.value.isInitialized)
-  //           Positioned.fill(
-  //             child: ClipRRect(
-  //               child: SizedBox(
-  //                 width: double.infinity,
-  //                 height: double.infinity,
-  //                 child: FittedBox(
-  //                   fit: BoxFit.cover,
-  //                   child: SizedBox(
-  //                     width: widget.cameraController!.value.previewSize!.height,
-  //                     height: widget.cameraController!.value.previewSize!.width,
-  //                     child: Stack(
-  //                       children: [
-  //                         CameraPreview(widget.cameraController!),
-  //                         if (_currentPose != null)
-  //                           Positioned.fill(
-  //                             child: CustomPaint(
-  //                               painter: PoseLandmarkPainter(
-  //                                 pose: _currentPose,
-  //                                 previewSize: widget.cameraController!.value.previewSize!,
-  //                                 cameraLensDirection: widget.cameraController!.description.lensDirection,
-  //                               ),
-  //                             ),
-  //                           ),
-  //                       ],
-  //                     ),
-  //                   ),
-  //                 ),
-  //               ),
-  //             ),
-  //           )
-  //         else
-  //           Positioned.fill(child: Container(color: Colors.black)),
-  //
-  //         // 校准状态覆盖层
-  //         if (_isCalibrating)
-  //           Positioned.fill(
-  //             child: Container(
-  //               color: Colors.black.withValues(alpha: 0.7),
-  //               child: Column(
-  //                 mainAxisAlignment: MainAxisAlignment.center,
-  //                 children: [
-  //                   const CircularProgressIndicator(color: Colors.white),
-  //                   const SizedBox(height: 30),
-  //                   Text(
-  //                     _calibrationMessage,
-  //                     style: const TextStyle(
-  //                       color: Colors.white,
-  //                       fontSize: 18,
-  //                       fontWeight: FontWeight.bold,
-  //                     ),
-  //                     textAlign: TextAlign.center,
-  //                   ),
-  //                   const SizedBox(height: 20),
-  //                   const Text(
-  //                     '请保持姿势稳定...',
-  //                     style: TextStyle(
-  //                       color: Colors.white70,
-  //                       fontSize: 14,
-  //                     ),
-  //                   ),
-  //                 ],
-  //               ),
-  //             ),
-  //           ),
-  //
-  //         // 校准失败提示
-  //         if (!_isCalibrating && !_isCalibrated && _calibrationMessage.isNotEmpty)
-  //           Positioned.fill(
-  //             child: Container(
-  //               color: Colors.black.withValues(alpha: 0.7),
-  //               child: Column(
-  //                 mainAxisAlignment: MainAxisAlignment.center,
-  //                 children: [
-  //                   const Icon(
-  //                     Icons.error_outline,
-  //                     color: Colors.red,
-  //                     size: 60,
-  //                   ),
-  //                   const SizedBox(height: 20),
-  //                   Text(
-  //                     _calibrationMessage,
-  //                     style: const TextStyle(
-  //                       color: Colors.white,
-  //                       fontSize: 18,
-  //                       fontWeight: FontWeight.bold,
-  //                     ),
-  //                     textAlign: TextAlign.center,
-  //                   ),
-  //                   const SizedBox(height: 30),
-  //                   ElevatedButton(
-  //                     onPressed: _startCalibration,
-  //                     style: ElevatedButton.styleFrom(
-  //                       backgroundColor: const Color(0xFF3C9566),
-  //                       foregroundColor: Colors.white,
-  //                       padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-  //                       shape: RoundedRectangleBorder(
-  //                         borderRadius: BorderRadius.circular(10),
-  //                       ),
-  //                     ),
-  //                     child: const Text('重新校准'),
-  //                   ),
-  //                 ],
-  //               ),
-  //             ),
-  //           ),
-  //
-  //         // UI 层
-  //         if (_isCalibrated)
-  //           Column(
-  //             children: [
-  //               _buildTopInfo(context, actionName, stepProgress),
-  //               const Spacer(),
-  //               GestureDetector(
-  //                 onTap: () => _showBottomSheet(context, actionName, checkItems, suggestion),
-  //                 child: Container(
-  //                   margin: const EdgeInsets.all(20),
-  //                   padding: const EdgeInsets.all(20),
-  //                   decoration: BoxDecoration(
-  //                     color: Colors.white.withValues(alpha: 0.6),
-  //                     borderRadius: BorderRadius.circular(24),
-  //                   ),
-  //                   child: Column(
-  //                     mainAxisSize: MainAxisSize.min,
-  //                     children: [
-  //                       Container(
-  //                         width: 40,
-  //                         height: 4,
-  //                         decoration: BoxDecoration(
-  //                           color: Colors.grey[300],
-  //                           borderRadius: BorderRadius.circular(2),
-  //                         ),
-  //                       ),
-  //                       const SizedBox(height: 16),
-  //                       Row(
-  //                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //                         children: [
-  //                           const Text(
-  //                             '姿态准确度',
-  //                             style: TextStyle(
-  //                               fontSize: 16,
-  //                               fontWeight: FontWeight.bold,
-  //                               color: Color(0xFF1E2939),
-  //                             ),
-  //                           ),
-  //                           Text(
-  //                             '${_poseAccuracy.toStringAsFixed(0)}%',
-  //                             style: TextStyle(
-  //                               fontSize: 24,
-  //                               fontWeight: FontWeight.bold,
-  //                               color: _isActionCompleted ? const Color(0xFF3C9566) : const Color(0xFFF59E0B),
-  //                             ),
-  //                           ),
-  //                         ],
-  //                       ),
-  //                       const SizedBox(height: 8),
-  //                       Text(
-  //                         suggestion,
-  //                         style: const TextStyle(
-  //                           fontSize: 12,
-  //                           color: Colors.grey,
-  //                         ),
-  //                         textAlign: TextAlign.center,
-  //                       ),
-  //                     ],
-  //                   ),
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //       ],
-  //     )),
-  //   );
-  // }
-
   int _selectedGuideTab = 0;
 
   @override
@@ -1288,12 +1257,10 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
                   children: [
                     _buildSectionHeader('智能运动纠错', 'AI实时姿态识别与纠正'),
                     const SizedBox(height: 20),
-                    if (_isCalibrated) ...[
-                      _buildProgressCard(actionName, progress),
-                      const SizedBox(height: 24),
-                      _buildDemoVideoSection(),
-                      const SizedBox(height: 24),
-                    ],
+                    _buildProgressCard(actionName, progress),
+                    const SizedBox(height: 24),
+                    _buildDemoVideoSection(),
+                    const SizedBox(height: 24),
                     _buildAiPreviewCard(),
                     const SizedBox(height: 16),
                     if (_isCalibrated) ...[
@@ -1301,8 +1268,6 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
                       const SizedBox(height: 16),
                       _buildEndPracticeButton(context),
                       const SizedBox(height: 16),
-                      _buildGuideCard(actionName, checkItems),
-                      const SizedBox(height: 40),
                     ] else
                       Padding(
                         padding: const EdgeInsets.only(bottom: 24),
@@ -1318,6 +1283,8 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
                           ),
                         ),
                       ),
+                    _buildGuideCard(actionName, checkItems),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -1562,55 +1529,6 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
                   color: const Color(0xFF0A1A3A).withValues(alpha: 0.45),
                 ),
               ),
-              SizedBox(
-                width: 96,
-                height: 192,
-                child: Stack(
-                  children: [
-                    Positioned(top: 0, left: 44, child: _pointDot()),
-                    Positioned(
-                      top: 32,
-                      left: 47,
-                      child: Container(
-                        width: 2,
-                        height: 96,
-                        color: const Color(0xFF22C55E),
-                      ),
-                    ),
-                    Positioned(
-                      top: 64,
-                      left: 0,
-                      child: Container(
-                        width: 96,
-                        height: 2,
-                        color: const Color(0xFF22C55E),
-                      ),
-                    ),
-                    Positioned(top: 60, left: 0, child: _pointDot()),
-                    Positioned(top: 60, right: 0, child: _pointDot()),
-                    Positioned(top: 60, left: 44, child: _pointDot()),
-                    Positioned(bottom: 0, left: 32, child: _pointDot()),
-                    Positioned(bottom: 0, right: 32, child: _pointDot()),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.photo_camera_outlined,
-                color: Colors.white70,
-                size: 52,
-              ),
-              if (_isCalibrated)
-                const Positioned(
-                  bottom: 34,
-                  child: Text(
-                    'AI正在识别姿态...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontFamily: 'STKaiti',
-                    ),
-                  ),
-                ),
               if (_isCalibrating)
                 Positioned.fill(
                   child: _buildCalibratingOverlayInCamera(),
@@ -1624,17 +1542,6 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _pointDot() {
-    return Container(
-      width: 8,
-      height: 8,
-      decoration: const BoxDecoration(
-        color: Color(0xFF22C55E),
-        shape: BoxShape.circle,
       ),
     );
   }
@@ -2111,224 +2018,4 @@ class _SportAiCorrectionScreenState extends State<SportAiCorrectionScreen> {
       ),
     );
   }
-
-  // void _showBottomSheet(BuildContext context, String actionName, List<String> checkItems, String suggestion) {
-  //   showModalBottomSheet(
-  //     context: context,
-  //     backgroundColor: Colors.transparent,
-  //     isScrollControlled: true,
-  //     isDismissible: true,
-  //     enableDrag: true,
-  //     barrierColor: Colors.black54,
-  //     builder: (context) => StatefulBuilder(
-  //       builder: (context, setState) => SafeArea(child: Container(
-  //         decoration: const BoxDecoration(
-  //           color: Colors.white,
-  //           borderRadius: BorderRadius.only(
-  //             topLeft: Radius.circular(32),
-  //             topRight: Radius.circular(32),
-  //           ),
-  //         ),
-  //         child: _buildCorrectionPanel(
-  //           context,
-  //           actionName,
-  //           checkItems,
-  //           _currentSuggestion,
-  //           _poseAccuracy,
-  //           _checkResults,
-  //         ),
-  //       )),
-  //     ),
-  //   );
-  // }
-  //
-  // Widget _buildTopInfo(BuildContext context, String actionName, double stepProgress) {
-  //   return Padding(
-  //     padding: const EdgeInsets.all(20),
-  //     child: Row(
-  //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //       children: [
-  //         Column(
-  //           crossAxisAlignment: CrossAxisAlignment.start,
-  //           children: [
-  //             Text(
-  //               actionName,
-  //               style: const TextStyle(
-  //                 color: Colors.white,
-  //                 fontSize: 20,
-  //                 fontWeight: FontWeight.bold,
-  //                 fontFamily: 'STKaiti',
-  //               ),
-  //             ),
-  //             const SizedBox(height: 4),
-  //             Row(
-  //               children: [
-  //                 Text(
-  //                   '${_sportSequenceManager.currentStepIndex}/${_sportSequenceManager.totalSteps}',
-  //                   style: const TextStyle(color: Colors.white70, fontSize: 12),
-  //                 ),
-  //                 const SizedBox(width: 8),
-  //                 Container(
-  //                   width: 120,
-  //                   height: 4,
-  //                   decoration: BoxDecoration(
-  //                     color: Colors.white24,
-  //                     borderRadius: BorderRadius.circular(2),
-  //                   ),
-  //                   child: FractionallySizedBox(
-  //                     alignment: Alignment.centerLeft,
-  //                     widthFactor: stepProgress,
-  //                     child: Container(
-  //                       decoration: BoxDecoration(
-  //                         color: const Color(0xFF3C9566),
-  //                         borderRadius: BorderRadius.circular(2),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ),
-  //               ],
-  //             ),
-  //           ],
-  //         ),
-  //         Container(
-  //           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-  //           decoration: BoxDecoration(
-  //             color: Colors.white24,
-  //             borderRadius: BorderRadius.circular(10),
-  //           ),
-  //           child: Text(
-  //             '${(_sportSequenceManager.currentStepIndex / _sportSequenceManager.totalSteps * 100).toStringAsFixed(0)}%',
-  //             style: const TextStyle(
-  //               color: Colors.white,
-  //               fontWeight: FontWeight.bold,
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // Widget _buildCorrectionPanel(
-  //     BuildContext context,
-  //     String actionName,
-  //     List<String> checkItems,
-  //     String currentSuggestion,
-  //     double poseAccuracy,
-  //     Map<String, bool> checkResults,
-  //     ) {
-  //   return Container(
-  //     padding: const EdgeInsets.all(24),
-  //     decoration: const BoxDecoration(
-  //       color: Colors.white,
-  //       borderRadius: BorderRadius.only(
-  //         topLeft: Radius.circular(32),
-  //         topRight: Radius.circular(32),
-  //       ),
-  //     ),
-  //     child: Column(
-  //       mainAxisSize: MainAxisSize.min,
-  //       children: [
-  //         Row(
-  //           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //           children: [
-  //             const Row(
-  //               children: [
-  //                 Icon(Icons.check_circle, color: Color(0xFF3C9566), size: 20),
-  //                 SizedBox(width: 8),
-  //                 Text(
-  //                   '姿态准确度',
-  //                   style: TextStyle(
-  //                     fontSize: 16,
-  //                     fontWeight: FontWeight.bold,
-  //                     color: Color(0xFF1E2939),
-  //                     fontFamily: 'STKaiti',
-  //                   ),
-  //                 ),
-  //               ],
-  //             ),
-  //             Text(
-  //               '${poseAccuracy.toStringAsFixed(0)}%',
-  //               style: const TextStyle(
-  //                 fontSize: 24,
-  //                 fontWeight: FontWeight.bold,
-  //                 color: Color(0xFF3C9566),
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //         const SizedBox(height: 16),
-  //         Container(
-  //           padding: const EdgeInsets.all(16),
-  //           decoration: BoxDecoration(
-  //             color: const Color(0xFFFFF9E6),
-  //             borderRadius: BorderRadius.circular(16),
-  //             border: Border.all(color: const Color(0xFFFDE68A)),
-  //           ),
-  //           child: Row(
-  //             children: [
-  //               const Icon(
-  //                 Icons.info_outline,
-  //                 color: Color(0xFFD97706),
-  //                 size: 20,
-  //               ),
-  //               const SizedBox(width: 12),
-  //               Expanded(
-  //                 child: Text(
-  //                   currentSuggestion,
-  //                   style: const TextStyle(
-  //                     color: Color(0xFF92400E),
-  //                     fontSize: 14,
-  //                     fontFamily: 'STKaiti',
-  //                   ),
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //         const SizedBox(height: 24),
-  //         Text(
-  //           actionName,
-  //           style: const TextStyle(
-  //             fontSize: 18,
-  //             fontWeight: FontWeight.bold,
-  //             color: Color(0xFF1E2939),
-  //             fontFamily: 'STKaiti',
-  //           ),
-  //         ),
-  //         const SizedBox(height: 12),
-  //         ...checkItems.asMap().entries.map((entry) {
-  //           final isChecked = checkResults[entry.value] ?? false;
-  //           return _checkItem(entry.value, isChecked);
-  //         }),
-  //         const SizedBox(height: 24),
-  //         SizedBox(
-  //           width: double.infinity,
-  //           height: 50,
-  //           child: ElevatedButton(
-  //             onPressed: () {
-  //               // 返回到运动主页，即弹出纠错页和准备页
-  //               Navigator.of(context).pop(); // 弹出当前纠错页
-  //               Navigator.of(context).pop(); // 弹出准备页，回到主页
-  //             },
-  //             style: ElevatedButton.styleFrom(
-  //               backgroundColor: const Color(0xFF3C9566),
-  //               foregroundColor: Colors.white,
-  //               shape: RoundedRectangleBorder(
-  //                 borderRadius: BorderRadius.circular(12),
-  //               ),
-  //             ),
-  //             child: const Text(
-  //               '结束练习',
-  //               style: TextStyle(
-  //                 fontWeight: FontWeight.bold,
-  //                 fontFamily: 'STKaiti',
-  //               ),
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 }
