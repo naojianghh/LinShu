@@ -34,7 +34,7 @@ Future<DiagnosisReport> analyzeImage({
 - 必须严格输出 JSON（不要 Markdown，不要解释文字）
 - 只能输出一个 JSON 对象
 - 体质报告必须包含：constitution、pattern、dietary_advice(3条)、lifestyle_advice(3条)、exercise_advice(2条)、risk_warning
-- 女神专区计划必须包含：dietary_advice(至少3条)、exercise_plan(至少2条)、care_advice(至少3条)、constitution_evolution、wellness_recommendation(至少1条)、weekly_focus、drink_recommendations（数组，至少3个元素，每个元素包含 name/description/price）
+- 女神专区计划必须包含：dietary_advice(至少3条)、exercise_plan(至少2条)、care_advice(至少3条)、constitution_evolution、wellness_recommendation(至少1条)、weekly_focus、drink_recommendations（数组，至少3个元素，每个元素包含 name/description/price （price格式为（￥ + 数字）））
 - 心灵栖息地计划必须包含：stress_index(0-100整数)、relax_percent(0-100整数)、suggestion（一句可执行建议）
 - 生成女神/心灵计划时，请参考你在同一 JSON 中生成的体质报告结果，并结合周期阶段 cyclePhase = "$cyclePhase"
 
